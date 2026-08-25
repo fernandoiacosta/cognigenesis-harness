@@ -12,3 +12,14 @@ policy:
     - core.*
     - filesystem.*
     - workspace.*
+    - shell.*
+
+model_qualification:
+  default_trust: observer
+  require_profile: true
+  capability_tiers:
+    filesystem.read: basic
+    filesystem.list: basic
+    filesystem.write: trusted
+    workspace.create_project: trusted
+    shell.run: trusted
