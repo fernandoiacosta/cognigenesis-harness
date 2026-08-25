@@ -1,0 +1,13 @@
+[project]
+name = "cognigenesis-harness"
+version = "0.1.0"
+description = "Minimal extensible agent runtime with a Markdown cognitive control plane."
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
