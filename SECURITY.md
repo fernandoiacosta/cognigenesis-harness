@@ -25,11 +25,13 @@ All built-in filesystem and workspace operations resolve paths relative to the c
 
 ## Shell
 
-Commands are tokenized with `shlex.split` and executed with `shell=False` inside the workspace. `shell.run` requires a higher model trust tier than read-only filesystem capabilities.
+`shell.run` is registered but **disabled by default**, even for highly qualified models. It requires explicit runtime opt-in plus the required model trust tier.
+
+Commands use `shlex.split` and `shell=False`, but running with the workspace as the current directory is not equivalent to an operating-system sandbox. Shell authority should remain disabled until a stronger process/filesystem sandbox is implemented or an operator deliberately accepts that risk.
 
 ## Policy Source of Truth
 
-`core/capability_policy.py` is the authoritative capability/trust mapping. `config.yaml` points to this source rather than duplicating the allowlist.
+`core/capability_policy.py` defines capability minimum trust tiers. `core/policy.py` enforces runtime authority. `config.yaml` points to these sources rather than duplicating capability grants.
 
 ## Extension Policy
 
