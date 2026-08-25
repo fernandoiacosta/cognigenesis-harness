@@ -8,6 +8,7 @@ workspace:
 
 policy:
   default: deny
+  shell_enabled: false
   authoritative_source: core/capability_policy.py
 
 model_qualification:
