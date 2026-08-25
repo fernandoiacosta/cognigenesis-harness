@@ -6,14 +6,24 @@ function Has-Command($Name) {
     return [bool](Get-Command $Name -ErrorAction SilentlyContinue)
 }
 
+# Private-repository installs need authenticated Git access. If GitHub CLI is
+# available, configure Git to reuse its authenticated credentials.
+if (Has-Command 'gh') {
+    & gh auth setup-git 2>$null
+}
+
 if (Has-Command 'uv') {
     & uv tool install $Package
-    exit $LASTEXITCODE
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Write-Host 'Installed: cogni'
+    exit 0
 }
 
 if (Has-Command 'pipx') {
     & pipx install $Package
-    exit $LASTEXITCODE
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    Write-Host 'Installed: cogni'
+    exit 0
 }
 
 if (Has-Command 'py') {
