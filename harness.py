@@ -6,6 +6,7 @@ from pathlib import Path
 from core.context import ContextCompiler
 from core.engine import ExecutionEngine
 from core.policy import Policy
+from core.qualification import conservative_profile
 from core.registry import CapabilityRegistry
 from providers.base import StubProvider
 from state.store import StateStore
@@ -21,9 +22,13 @@ def build_engine(workspace: Path) -> ExecutionEngine:
     register_workspace_tools(registry, workspace)
 
     state = StateStore(workspace / ".cognigenesis" / "state.json")
-    policy = Policy(workspace=workspace)
-    compiler = ContextCompiler(workspace=workspace, registry=registry, state=state)
     provider = StubProvider()
+
+    # Models begin conservatively restricted. Provider-specific qualification
+    # may replace this bootstrap profile after measured evaluation.
+    model_profile = conservative_profile("stub", "stub")
+    policy = Policy(workspace=workspace, model_profile=model_profile)
+    compiler = ContextCompiler(workspace=workspace, registry=registry, state=state)
 
     return ExecutionEngine(
         provider=provider,
