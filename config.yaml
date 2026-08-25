@@ -1,0 +1,14 @@
+runtime:
+  max_steps: 12
+  default_mode: architect
+  provider: stub
+
+workspace:
+  root: workspace
+
+policy:
+  default: deny
+  allow:
+    - core.*
+    - filesystem.*
+    - workspace.*
