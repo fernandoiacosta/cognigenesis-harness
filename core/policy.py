@@ -1,13 +1,32 @@
 from __future__ import annotations
 from pathlib import Path
 
+from core.capability_policy import minimum_tier_for
+from core.model_profile import ModelProfile, UNQUALIFIED_PROFILE
+
 
 class Policy:
-    def __init__(self, workspace: Path) -> None:
+    def __init__(self, workspace: Path, model_profile: ModelProfile | None = None) -> None:
         self.workspace = workspace.resolve()
+        self.model_profile = model_profile or UNQUALIFIED_PROFILE
+        self.allowed_prefixes = ("core.", "filesystem.", "workspace.", "shell.")
 
     def authorize(self, capability_id: str, arguments: dict) -> tuple[bool, str]:
-        # Initial conservative policy. Expand with explicit permission metadata.
-        if capability_id.startswith(("filesystem.", "workspace.", "core.", "shell.")):
-            return True, "allowed by default workspace policy"
-        return False, f"capability not approved by policy: {capability_id}"
+        if not capability_id.startswith(self.allowed_prefixes):
+            return False, f"capability not approved by runtime policy: {capability_id}"
+
+        minimum_tier = minimum_tier_for(capability_id)
+        if not self.model_profile.permits(minimum_tier):
+            return (
+                False,
+                "model trust tier insufficient: "
+                f"model={self.model_profile.model} "
+                f"tier={self.model_profile.tier.name} "
+                f"required={minimum_tier.name} "
+                f"capability={capability_id}",
+            )
+
+        return True, (
+            "allowed by runtime policy and model trust gate: "
+            f"tier={self.model_profile.tier.name}"
+        )
