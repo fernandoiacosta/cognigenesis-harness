@@ -2,17 +2,28 @@
 set -eu
 
 REPO="fernandoiacosta/cognigenesis-harness"
+PACKAGE="git+https://github.com/${REPO}.git"
+
+# Private-repository installs need authenticated Git access. If GitHub CLI is
+# available, configure Git to reuse its authenticated credentials.
+if command -v gh >/dev/null 2>&1; then
+  gh auth setup-git >/dev/null 2>&1 || true
+fi
 
 if command -v uv >/dev/null 2>&1; then
-  exec uv tool install "git+https://github.com/${REPO}.git"
+  uv tool install "$PACKAGE"
+  printf '\nInstalled: cogni\n'
+  exit 0
 fi
 
 if command -v pipx >/dev/null 2>&1; then
-  exec pipx install "git+https://github.com/${REPO}.git"
+  pipx install "$PACKAGE"
+  printf '\nInstalled: cogni\n'
+  exit 0
 fi
 
 if command -v python3 >/dev/null 2>&1; then
-  python3 -m pip install --user "git+https://github.com/${REPO}.git"
+  python3 -m pip install --user "$PACKAGE"
   printf '\nInstalled. Ensure your user Python bin directory is on PATH, then run: cogni --help\n'
   exit 0
 fi
