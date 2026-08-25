@@ -8,18 +8,9 @@ workspace:
 
 policy:
   default: deny
-  allow:
-    - core.*
-    - filesystem.*
-    - workspace.*
-    - shell.*
+  authoritative_source: core/capability_policy.py
 
 model_qualification:
   default_trust: observer
   require_profile: true
-  capability_tiers:
-    filesystem.read: basic
-    filesystem.list: basic
-    filesystem.write: trusted
-    workspace.create_project: trusted
-    shell.run: trusted
+  authoritative_source: core/model_profile.py
