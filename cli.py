@@ -2,19 +2,25 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import shutil
+import sys
 from pathlib import Path
+from urllib import error, request
 
+from core.stdio import configure_utf8_stdio
 from harness import build_engine
 from providers.base import ProviderError
 from providers.factory import provider_identity
+from providers.ollama import DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL
 
 
-VERSION = "0.5.0"
+VERSION = "0.6.0"
 
 
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="cogni", description="Cognigenesis Harness CLI")
-    parser.add_argument("objective", nargs="?", help="Objective, or 'chat' for interactive mode")
+    parser.add_argument("objective", nargs="?", help="Objective, 'chat', or 'doctor'")
     parser.add_argument("--workspace", default="workspace", help="Sandbox workspace directory")
     parser.add_argument("--provider", default=None, choices=["ollama", "stub"])
     parser.add_argument("--model", default=None)
@@ -109,12 +115,50 @@ def _run_chat(args: argparse.Namespace) -> int:
         print(f"Cogni > {result}\n")
 
 
+def _run_doctor(args: argparse.Namespace) -> int:
+    base_url = (args.base_url or os.getenv("COGNI_OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
+    model = args.model or os.getenv("COGNI_OLLAMA_MODEL") or DEFAULT_OLLAMA_MODEL
+    print(f"Cognigenesis Harness {VERSION} diagnostics")
+    print(f"Python:       {sys.executable}")
+    print(f"Python ver:   {sys.version.split()[0]}")
+    print(f"stdout:       {getattr(sys.stdout, 'encoding', None)}")
+    print(f"cogni:        {shutil.which('cogni') or 'NOT FOUND'}")
+    print(f"cogni-acp:    {shutil.which('cogni-acp') or 'NOT FOUND'}")
+    print(f"Ollama URL:   {base_url}")
+    print(f"Ollama model: {model}")
+
+    try:
+        req = request.Request(f"{base_url}/api/tags", headers={"User-Agent": "Cognigenesis-Harness/doctor"})
+        with request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode("utf-8"))
+        names = [item.get("name") for item in data.get("models", []) if item.get("name")]
+        print("Ollama:       reachable")
+        print(f"Model status: {'installed' if model in names else 'MISSING'}")
+        if model not in names:
+            print(f"Fix:          ollama pull {model}")
+    except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
+        print(f"Ollama:       NOT REACHABLE ({exc})")
+        print("Fix:          start Ollama, then run: ollama list")
+
+    appdata = os.getenv("APPDATA")
+    if appdata:
+        legacy = Path(appdata) / "AionUi" / "cognigenesis" / "cognigenesis_ollama.py"
+        if legacy.exists():
+            print(f"\nWARNING: legacy AionUi bridge detected:\n  {legacy}")
+            print("Your AionUi conversation may still be bypassing the packaged cogni-acp agent.")
+            print("Fix AionUi Custom Agent command to the installed cogni-acp executable and leave arguments empty.")
+    return 0
+
+
 def main() -> None:
+    configure_utf8_stdio()
     parser = _build_parser()
     args = parser.parse_args()
 
     if args.objective == "chat":
         raise SystemExit(_run_chat(args))
+    if args.objective == "doctor":
+        raise SystemExit(_run_doctor(args))
 
     if not args.objective:
         parser.print_help()
