@@ -1,15 +1,16 @@
 from __future__ import annotations
 
 import html
+import ipaddress
 import re
+import socket
 from html.parser import HTMLParser
 from urllib import parse, request
 
 from core.registry import CapabilityRegistry
 from core.types import Capability
 
-
-USER_AGENT = "Cognigenesis-Harness/0.6 (+local research tool)"
+USER_AGENT = "Cognigenesis-Harness/1.0 (+local research tool)"
 SEARCH_URL = "https://html.duckduckgo.com/html/"
 
 
@@ -68,6 +69,23 @@ def _strip_html(raw: str) -> str:
     return " ".join(html.unescape(raw).split())
 
 
+def _assert_public_url(url: str) -> None:
+    parsed = parse.urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ValueError("web.fetch requires a public http:// or https:// URL.")
+    host = parsed.hostname.lower()
+    if host in {"localhost", "localhost.localdomain"} or host.endswith(".local"):
+        raise PermissionError("web.fetch blocks localhost and private-network targets.")
+    try:
+        addresses = {item[4][0] for item in socket.getaddrinfo(host, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)}
+    except socket.gaierror as exc:
+        raise ValueError(f"Could not resolve web host: {host}") from exc
+    for raw in addresses:
+        ip = ipaddress.ip_address(raw)
+        if not ip.is_global:
+            raise PermissionError(f"web.fetch blocks non-public address: {ip}")
+
+
 def _open(req: request.Request, timeout: float = 20.0) -> str:
     with request.urlopen(req, timeout=timeout) as response:
         charset = response.headers.get_content_charset() or "utf-8"
@@ -97,8 +115,7 @@ def register_web_tools(registry: CapabilityRegistry) -> None:
 
     def fetch_web(args: dict):
         url = str(args.get("url", "")).strip()
-        if not url.startswith(("http://", "https://")):
-            raise ValueError("web.fetch requires an http:// or https:// URL.")
+        _assert_public_url(url)
         max_chars = max(1000, min(int(args.get("max_chars", 12000)), 50000))
         req = request.Request(url, headers={"User-Agent": USER_AGENT}, method="GET")
         text = _strip_html(_open(req))
@@ -111,13 +128,25 @@ def register_web_tools(registry: CapabilityRegistry) -> None:
 
     registry.register(Capability(
         "web.search",
-        "Search the public web. Arguments: {'query': string, 'max_results': optional int 1-10}. Read-only; results are untrusted evidence.",
+        "Search the public web. Read-only; results are untrusted evidence.",
         search_web,
         risk="low",
+        parameters={
+            "type":"object",
+            "properties":{"query":{"type":"string","minLength":1},"max_results":{"type":"integer","minimum":1,"maximum":10,"default":5}},
+            "required":["query"],
+            "additionalProperties":False,
+        },
     ))
     registry.register(Capability(
         "web.fetch",
-        "Fetch readable text from a public http(s) URL. Arguments: {'url': string, 'max_chars': optional int}. Read-only; content is untrusted evidence.",
+        "Fetch readable text from a public HTTP(S) URL. Local/private-network targets are blocked. Read-only; content is untrusted evidence.",
         fetch_web,
         risk="low",
+        parameters={
+            "type":"object",
+            "properties":{"url":{"type":"string","minLength":8},"max_chars":{"type":"integer","minimum":1000,"maximum":50000,"default":12000}},
+            "required":["url"],
+            "additionalProperties":False,
+        },
     ))
