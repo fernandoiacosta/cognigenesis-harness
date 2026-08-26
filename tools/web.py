@@ -19,37 +19,38 @@ class _DuckDuckGoParser(HTMLParser):
         self.results: list[dict[str, str]] = []
         self._in_title = False
         self._in_snippet = False
-        self._current: dict[str, str] | None = None
+        self._current_title: dict[str, str] | None = None
+        self._snippet_target: dict[str, str] | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attrs_dict = dict(attrs)
         css = attrs_dict.get("class") or ""
         if tag == "a" and "result__a" in css:
             href = attrs_dict.get("href") or ""
-            self._current = {"title": "", "url": _unwrap_ddg_url(href), "snippet": ""}
+            self._current_title = {"title": "", "url": _unwrap_ddg_url(href), "snippet": ""}
             self._in_title = True
-        elif "result__snippet" in css and self._current is not None:
+        elif "result__snippet" in css and self.results:
+            self._snippet_target = self.results[-1]
             self._in_snippet = True
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "a" and self._in_title:
             self._in_title = False
-            if self._current is not None:
-                self.results.append(self._current)
-                self._current = None
-        if self._in_snippet:
+            if self._current_title is not None:
+                self.results.append(self._current_title)
+                self._current_title = None
+        if self._in_snippet and tag in {"a", "div", "span"}:
             self._in_snippet = False
+            self._snippet_target = None
 
     def handle_data(self, data: str) -> None:
-        if self._current is None:
-            return
         text = " ".join(data.split())
         if not text:
             return
-        if self._in_title:
-            self._current["title"] = (self._current["title"] + " " + text).strip()
-        elif self._in_snippet:
-            self._current["snippet"] = (self._current["snippet"] + " " + text).strip()
+        if self._in_title and self._current_title is not None:
+            self._current_title["title"] = (self._current_title["title"] + " " + text).strip()
+        elif self._in_snippet and self._snippet_target is not None:
+            self._snippet_target["snippet"] = (self._snippet_target["snippet"] + " " + text).strip()
 
 
 def _unwrap_ddg_url(url: str) -> str:
