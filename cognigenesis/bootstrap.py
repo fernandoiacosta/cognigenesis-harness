@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +40,13 @@ def install_brand_assets() -> dict[str, Path]:
     return outputs
 
 
+def pull_model(model: str) -> None:
+    executable = shutil.which("ollama")
+    if not executable:
+        raise RuntimeError("Ollama CLI is not installed or not on PATH.")
+    subprocess.run([executable, "pull", model], check=True)
+
+
 def run_checks(settings: Settings | None = None) -> list[Check]:
     settings = settings or load_settings()
     checks: list[Check] = []
@@ -57,7 +65,7 @@ def run_checks(settings: Settings | None = None) -> list[Check]:
         elif models:
             checks.append(Check("Model", True, models[0]))
         else:
-            checks.append(Check("Model", False, "no local Ollama models", "ollama pull llama3.1:8b"))
+            checks.append(Check("Model", False, "no local Ollama models", "cogni setup --pull"))
     except Exception as exc:
         checks.append(Check("Ollama", False, f"not reachable: {exc}", "Start Ollama and run: ollama list"))
 
