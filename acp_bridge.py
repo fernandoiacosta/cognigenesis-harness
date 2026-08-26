@@ -31,6 +31,7 @@ from acp.schema import (
 )
 
 from core.engine import ExecutionEngine
+from core.stdio import configure_utf8_stdio
 from harness import build_engine
 from providers.base import ProviderError
 
@@ -99,9 +100,10 @@ class CognigenesisAcpAgent(Agent):
             try:
                 result = await asyncio.to_thread(session.engine.run, objective)
             except ProviderError as exc:
-                # Send a classified, actionable provider message instead of leaking an
-                # opaque ACP internal error that AionUi reports as UNKNOWN_UPSTREAM_ERROR.
                 await self._send_text(session_id, f"Provider error: {exc}")
+                return PromptResponse(stop_reason="end_turn")
+            except Exception as exc:
+                await self._send_text(session_id, f"Runtime error: {type(exc).__name__}: {exc}")
                 return PromptResponse(stop_reason="end_turn")
             cancelled = session.cancel_event.is_set()
             await self._send_text(session_id, result)
@@ -121,6 +123,8 @@ async def _main() -> None:
 
 
 def main() -> None:
+    # ACP owns stdout. Force UTF-8 without printing banners or logs.
+    configure_utf8_stdio()
     asyncio.run(_main())
 
 
