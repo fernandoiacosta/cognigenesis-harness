@@ -12,7 +12,13 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
 from cognigenesis import __version__
-from cognigenesis.bootstrap import aionui_configuration, auto_setup, pull_model, run_checks
+from cognigenesis.bootstrap import (
+    aionui_configuration,
+    auto_setup,
+    pull_model,
+    qualify_settings,
+    run_checks,
+)
 from cognigenesis.config import config_path, history_path, load_settings
 from cognigenesis.console import (
     RuntimeIdentity,
@@ -24,13 +30,14 @@ from cognigenesis.console import (
     success_message,
     warning_message,
 )
+from core.model_profile import TrustTier
 from core.stdio import configure_utf8_stdio
 from harness import build_engine
 from providers.base import ProviderError
 from providers.factory import provider_identity
 
 VERSION = __version__
-KNOWN_COMMANDS = {"run", "chat", "setup", "doctor", "aionui", "config"}
+KNOWN_COMMANDS = {"run", "chat", "setup", "qualify", "doctor", "aionui", "config"}
 
 
 def _provider_args(parser: argparse.ArgumentParser) -> None:
@@ -61,13 +68,20 @@ def _parser() -> argparse.ArgumentParser:
     chat = sub.add_parser("chat", help="Start the persistent themed chat interface")
     _provider_args(chat)
 
-    setup = sub.add_parser("setup", help="Configure Cognigenesis and auto-detect Ollama")
+    setup = sub.add_parser("setup", help="Configure, discover, and qualify the local Ollama model")
     setup.add_argument("--model", default=None)
     setup.add_argument("--base-url", default=None)
     setup.add_argument("--timeout", type=float, default=None)
     setup.add_argument("--pull", action="store_true", help="Pull the selected Ollama model if it is missing")
+    setup.add_argument("--skip-qualify", action="store_true", help="Skip first-run behavioral qualification")
 
-    doctor = sub.add_parser("doctor", help="Diagnose installation, Ollama, model, PATH, and AionUi")
+    qualify = sub.add_parser("qualify", help="Evaluate the configured model and persist its trust profile")
+    qualify.add_argument("--model", default=None)
+    qualify.add_argument("--base-url", default=None)
+    qualify.add_argument("--timeout", type=float, default=None)
+    qualify.add_argument("--force", action="store_true", help="Rerun even when a saved profile exists")
+
+    doctor = sub.add_parser("doctor", help="Diagnose installation, Ollama, model, qualification, PATH, and AionUi")
     doctor.add_argument("--json", action="store_true", dest="as_json")
 
     aionui = sub.add_parser("aionui", help="Show first-class AionUi custom-agent configuration")
@@ -125,7 +139,7 @@ def _run_chat(args: argparse.Namespace) -> int:
     engine, workspace = _make_engine(args)
     provider_name, model_name = provider_identity(engine.provider)
     banner(VERSION, RuntimeIdentity(provider_name, model_name, str(workspace)))
-    console.print("[cogni.muted]Type /help for commands. Ctrl+C cancels input; Ctrl+D exits.[/]\n")
+    console.print(f"[cogni.muted]Trust:[/] {engine.policy.model_profile.tier.name}  [cogni.muted]• Type /help for commands.[/]\n")
     session = _prompt_session()
 
     while True:
@@ -153,7 +167,8 @@ def _run_chat(args: argparse.Namespace) -> int:
                 console.print(f"[cogni.violet]•[/] [bold]{capability['id']}[/] [cogni.muted]{capability['description']}[/]")
             continue
         if prompt == "/provider":
-            p, m = provider_identity(engine.provider); status_table([("provider", p, "cogni.green"), ("model", m, "")]); continue
+            p, m = provider_identity(engine.provider)
+            status_table([("provider", p, "cogni.green"), ("model", m, ""), ("trust", engine.policy.model_profile.tier.name, "cogni.violet")]); continue
         if prompt == "/workspace":
             console.print(str(workspace)); continue
         if prompt == "/doctor":
@@ -187,6 +202,37 @@ def _render_checks(checks) -> int:
     return 0 if failures == 0 else 1
 
 
+def _render_qualification(profile, evidence, created: bool) -> int:
+    status_table([
+        ("provider", profile.provider, "cogni.green"),
+        ("model", profile.model, ""),
+        ("trust tier", profile.tier.name, "cogni.violet"),
+        ("score", f"{profile.score:.3f}", "cogni.cyan"),
+        ("profile", "updated" if created else "existing", "cogni.green"),
+    ])
+    for item in evidence:
+        marker = "✓" if item["passed"] else "✗"
+        style = "cogni.green" if item["passed"] else "cogni.red"
+        console.print(f"[{style}]{marker}[/] {item['case']}  [cogni.muted]{item['score']:.2f}[/]")
+    if profile.tier >= TrustTier.TRUSTED:
+        success_message("Model qualified for normal trust-gated workspace operation.")
+        return 0
+    warning_message("Model remains below TRUSTED. Mutation capabilities stay restricted; review the failed qualification cases.")
+    return 1
+
+
+def _run_qualify(args: argparse.Namespace) -> int:
+    banner(VERSION)
+    settings, _ = auto_setup(model=args.model, base_url=args.base_url, timeout=args.timeout)
+    try:
+        with console.status("[cogni.violet]Qualifying model behavior…[/]", spinner="dots"):
+            profile, evidence, created = qualify_settings(settings, force=args.force)
+    except Exception as exc:
+        error_message(f"Qualification failed: {exc}")
+        return 1
+    return _render_qualification(profile, evidence, created)
+
+
 def _run_setup(args: argparse.Namespace) -> int:
     banner(VERSION)
     settings, checks = auto_setup(model=args.model, base_url=args.base_url, timeout=args.timeout)
@@ -197,6 +243,20 @@ def _run_setup(args: argparse.Namespace) -> int:
             settings, checks = auto_setup(model=settings.model, base_url=settings.ollama_base_url, timeout=settings.ollama_timeout)
         except Exception as exc:
             error_message(f"Could not pull model: {exc}")
+
+    model_ok = any(check.name == "Model" and check.ok for check in checks)
+    if model_ok and not args.skip_qualify:
+        try:
+            existing_ok = any(check.name == "Qualification" and check.ok for check in checks)
+            if not existing_ok:
+                console.print("[cogni.violet]Running bounded model qualification…[/]")
+                profile, evidence, created = qualify_settings(settings)
+                _render_qualification(profile, evidence, created)
+                checks = run_checks(settings)
+        except Exception as exc:
+            warning_message(f"Qualification did not complete: {exc}. You can retry with: cogni qualify --force")
+            checks = run_checks(settings)
+
     console.print(f"[cogni.muted]Config:[/] {config_path()}")
     console.print(f"[cogni.muted]Provider:[/] {settings.provider}")
     console.print(f"[cogni.muted]Model:[/] {settings.model}")
@@ -244,6 +304,8 @@ def main() -> None:
         raise SystemExit(_run_chat(args))
     if args.command == "setup":
         raise SystemExit(_run_setup(args))
+    if args.command == "qualify":
+        raise SystemExit(_run_qualify(args))
     if args.command == "doctor":
         raise SystemExit(_run_doctor(args.as_json))
     if args.command == "aionui":
