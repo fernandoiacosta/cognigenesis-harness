@@ -9,7 +9,7 @@ from core.engine import ExecutionEngine
 from core.policy import Policy
 from core.qualification import conservative_profile
 from core.registry import CapabilityRegistry
-from providers.base import StubProvider
+from providers.factory import build_provider, provider_identity
 from state.store import StateStore
 from tools.filesystem import register_filesystem_tools
 from tools.shell import register_shell_tools
@@ -20,6 +20,11 @@ def build_engine(
     workspace: Path,
     cancel_event: Event | None = None,
     state_path: Path | None = None,
+    *,
+    provider_name: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+    timeout: float | None = None,
 ) -> ExecutionEngine:
     registry = CapabilityRegistry()
     register_filesystem_tools(registry, workspace)
@@ -27,11 +32,12 @@ def build_engine(
     register_workspace_tools(registry, workspace)
 
     state = StateStore(state_path or workspace / ".cognigenesis" / "state.json")
-    provider = StubProvider()
+    provider = build_provider(provider_name, model=model, base_url=base_url, timeout=timeout)
+    provider_id, model_id = provider_identity(provider)
 
-    # Models begin conservatively restricted. Provider-specific qualification
-    # may replace this bootstrap profile after measured evaluation.
-    model_profile = conservative_profile("stub", "stub")
+    # New models start conservatively restricted until provider-specific
+    # qualification evidence promotes them.
+    model_profile = conservative_profile(provider_id, model_id)
     policy = Policy(workspace=workspace, model_profile=model_profile)
     compiler = ContextCompiler(workspace=workspace, registry=registry, state=state)
 
@@ -50,14 +56,23 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Cognigenesis minimal agent harness")
     parser.add_argument("objective", help="Objective for the harness")
     parser.add_argument("--workspace", default="workspace", help="Sandbox workspace directory")
+    parser.add_argument("--provider", default=None, choices=["ollama", "stub"])
+    parser.add_argument("--model", default=None)
+    parser.add_argument("--base-url", default=None)
+    parser.add_argument("--timeout", default=None, type=float)
     args = parser.parse_args()
 
     workspace = Path(args.workspace).resolve()
     workspace.mkdir(parents=True, exist_ok=True)
 
-    engine = build_engine(workspace)
-    result = engine.run(args.objective)
-    print(result)
+    engine = build_engine(
+        workspace,
+        provider_name=args.provider,
+        model=args.model,
+        base_url=args.base_url,
+        timeout=args.timeout,
+    )
+    print(engine.run(args.objective))
 
 
 if __name__ == "__main__":
