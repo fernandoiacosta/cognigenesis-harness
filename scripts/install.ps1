@@ -13,28 +13,30 @@ if (Has-Command 'gh') {
 }
 
 if (Has-Command 'uv') {
-    & uv tool install $Package
+    & uv tool install --force $Package
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Host 'Installed: cogni'
+    Write-Host 'Installed/updated: cogni, cogni-acp'
     exit 0
 }
 
 if (Has-Command 'pipx') {
-    & pipx install $Package
+    & pipx install --force $Package
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-    Write-Host 'Installed: cogni'
+    Write-Host 'Installed/updated: cogni, cogni-acp'
     exit 0
 }
 
 if (Has-Command 'py') {
-    & py -m pip install --user $Package
-    Write-Host 'Installed. Ensure your Python Scripts directory is on PATH, then run: cogni --help'
+    & py -m pip install --user --upgrade $Package
+    Write-Host 'Installed/updated. Ensure your Python Scripts directory is on PATH.'
+    Write-Host 'Commands: cogni, cogni-acp'
     exit $LASTEXITCODE
 }
 
 if (Has-Command 'python') {
-    & python -m pip install --user $Package
-    Write-Host 'Installed. Ensure your Python Scripts directory is on PATH, then run: cogni --help'
+    & python -m pip install --user --upgrade $Package
+    Write-Host 'Installed/updated. Ensure your Python Scripts directory is on PATH.'
+    Write-Host 'Commands: cogni, cogni-acp'
     exit $LASTEXITCODE
 }
 
