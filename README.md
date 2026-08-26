@@ -2,85 +2,71 @@
 
 ![Cognigenesis logo](assets/brand/cognigenesis-logo.svg)
 
-A local-first conversational agent runtime with Ollama, ACP-over-stdio support for AionUi, trust-gated capabilities, persistent chat, and read-only web research.
+**Local-first adaptive intelligence runtime for Ollama, terminal chat, web research, trusted tools, and first-class ACP/AionUi integration.**
 
-## v0.6.0 — research + Windows hardening
+Cognigenesis Harness v1.0 is designed as a product rather than a collection of wrappers: one configuration source, one execution kernel, one capability registry, one persistent conversation model, and two supported interfaces—`cogni` for humans and `cogni-acp` for ACP clients.
 
-This release fixes three concrete failure modes seen in AionUi/Windows:
+## Quick start
 
-1. **Long Ollama prompts timing out** — default timeout is now 300s and timeout errors are classified separately from connection failures.
-2. **Windows cp1252 crashes on emoji/Unicode** — `cogni`, `cogni-acp`, and the direct harness entry point force UTF-8 stdio.
-3. **"Research online" without a web tool** — Cognigenesis now registers read-only `web.search` and `web.fetch` capabilities and instructs Ollama to use them for current/online research requests.
-
-It also adds:
+### Windows PowerShell
 
 ```powershell
+$script = gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.ps1 -H "Accept: application/vnd.github.raw+json"; Invoke-Expression ($script -join "`n")
+```
+
+### macOS / Linux
+
+```bash
+gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.sh -H "Accept: application/vnd.github.raw+json" | sh
+```
+
+The installer upgrades/reinstalls the package, verifies `cogni` and `cogni-acp`, repairs the Windows user PATH when a user-site install needs it, exports the brand assets, and runs first-use setup.
+
+Then:
+
+```text
+cogni chat
+```
+
+## Terminal experience
+
+`cogni chat` is a persistent themed conversation interface with Markdown rendering, command history, auto-suggestions, runtime status, and durable workspace conversation state.
+
+```text
+cogni chat --workspace .
+```
+
+Useful commands:
+
+```text
+/help          commands
+/new           clear this workspace conversation
+/state         runtime state
+/capabilities  registered capabilities
+/provider      active provider/model
+/workspace     active workspace
+/doctor        health diagnostics
+/exit          exit
+```
+
+One-shot compatibility remains:
+
+```text
+cogni "Research current agent harnesses and compare them"
+cogni run --model hasi-edge-AG:latest "Say OK"
+```
+
+## First-use setup and diagnostics
+
+```text
+cogni setup
 cogni doctor
+cogni config
 ```
 
-which checks the installed executables, Python/stdout encoding, Ollama reachability/model availability, and warns if the old AionUi workaround script still exists at:
+`setup` discovers local Ollama models and prefers `hasi-edge-AG:latest`, then `llama3.1:8b`, then the first installed model. Configuration is persisted in the OS-standard user config directory and may be overridden by CLI flags or environment variables.
 
-```text
-%APPDATA%\AionUi\cognigenesis\cognigenesis_ollama.py
-```
-
-If that warning appears, AionUi may still be bypassing the packaged ACP agent.
-
-## Install / upgrade
-
-```powershell
-python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
-```
-
-Verify:
-
-```powershell
-cogni --version
-cogni doctor
-where.exe cogni-acp
-ollama list
-```
-
-Expected version: `cognigenesis-harness 0.6.0`.
-
-## Terminal chat
-
-```powershell
-cogni chat --provider ollama --model hasi-edge-AG:latest --workspace .
-```
-
-One-shot execution still works:
-
-```powershell
-cogni --provider ollama --model hasi-edge-AG:latest "Research online and compare modern agent harnesses"
-```
-
-Default Ollama environment:
-
-```text
-COGNI_PROVIDER=ollama
-COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
-COGNI_OLLAMA_MODEL=llama3.1:8b
-COGNI_OLLAMA_TIMEOUT=300
-```
-
-For a slow local model, increase the timeout explicitly:
-
-```powershell
-$env:COGNI_OLLAMA_TIMEOUT = "600"
-```
-
-## AionUi custom ACP agent
-
-Configure AionUi Custom Agent as:
-
-```text
-Display name: Cognigenesis
-Command:      cogni-acp
-Arguments:    <empty>
-```
-
-Recommended environment variables:
+Supported environment overrides:
 
 ```text
 COGNI_PROVIDER=ollama
@@ -89,28 +75,75 @@ COGNI_OLLAMA_MODEL=hasi-edge-AG:latest
 COGNI_OLLAMA_TIMEOUT=300
 ```
 
-**Do not point AionUi at the old local `cognigenesis_ollama.py` bridge.** The packaged `cogni-acp` process is the maintained path.
+If Ollama is unavailable or a model is missing, Cognigenesis returns a specific actionable error rather than a generic upstream failure.
 
-See [`AIONUI.md`](AIONUI.md).
+## AionUi / ACP
 
-## Research capabilities
-
-Cognigenesis now exposes:
+Cognigenesis ships a Python-native ACP-over-stdio process:
 
 ```text
-web.search  Search the public web (read-only)
-web.fetch   Fetch readable text from public HTTP(S) pages (read-only)
+cogni-acp
 ```
 
-External content is explicitly marked untrusted. Web research does not grant filesystem mutation or shell authority.
+Generate the exact local AionUi settings with:
 
-## Conversation model
+```text
+cogni aionui
+```
 
-The same `ExecutionEngine` backs terminal chat and ACP sessions, retaining prior user/assistant turns across repeated calls.
+The command prints the absolute installed `cogni-acp` path, environment variables, and the exported Cognigenesis logo path. The ACP bridge never needs the old Node/`.cmd` wrapper workaround.
+
+See [AIONUI.md](AIONUI.md).
+
+## Runtime architecture
+
+```text
+user / AionUi
+      │
+      ▼
+terminal UI / ACP stdio
+      │
+      ▼
+Cognitive Control Plane (packaged)
+      │
+      ▼
+Context Compiler + durable conversation
+      │
+      ▼
+Provider (Ollama by default)
+      │
+      ▼
+Execution Kernel
+      │
+      ├── policy gate
+      ├── model-trust gate
+      └── capability registry
+              │
+              ├── filesystem.*
+              ├── workspace.*
+              ├── web.search / web.fetch
+              └── shell.run (registered, disabled by default)
+```
+
+The model sees explicit JSON schemas for tools. Multi-step execution preserves the canonical `user → assistant(tool_calls) → tool(result) → assistant` transcript expected by chat/tool APIs.
+
+## Research
+
+`web.search` and `web.fetch` are read-only. Retrieved content is labeled untrusted, and `web.fetch` rejects localhost, private, reserved, and other non-public network addresses to prevent the research tool from becoming an SSRF path.
+
+## State and conversation continuity
+
+Conversation history is persisted per workspace using atomic writes under `.cognigenesis/`. Closing and reopening `cogni chat --workspace .` restores the bounded recent conversation. `/new` clears it.
+
+ACP sessions use isolated state files under:
+
+```text
+<workspace>/.cognigenesis/sessions/<session-id>.json
+```
 
 ## Brand and theme
 
-Canonical assets:
+Canonical repository assets:
 
 ```text
 assets/brand/cognigenesis-logo.svg
@@ -118,8 +151,12 @@ assets/brand/theme.json
 assets/brand/theme.css
 ```
 
-See [`BRANDING.md`](BRANDING.md).
+Installed copies are exported by `cogni setup` to the OS user data directory so external clients can use them without locating the Git checkout.
 
-## Tests
+See [BRANDING.md](BRANDING.md).
 
-CI covers Ubuntu, macOS, and Windows and includes Ollama provider tests, timeout classification, provider selection, persistent conversation history, ACP subprocess handshake, Windows-safe Python launch behavior, and web research parser/policy tests.
+## Installation quality gate
+
+CI runs on Windows, macOS, and Ubuntu across Python 3.11–3.14. It executes the test suite, builds a real wheel/sdist, installs the built wheel, verifies packaged cognitive/theme resources outside the repository, checks both executables, validates AionUi configuration output, runs ACP subprocess smoke tests, and syntax-checks the platform installers.
+
+See [INSTALL.md](INSTALL.md), [SECURITY.md](SECURITY.md), and [ARCHITECTURE.md](ARCHITECTURE.md).
