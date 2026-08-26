@@ -15,10 +15,10 @@ Completed:
 - [x] client-supplied additional directories/MCP descriptors kept outside automatic authority
 - [x] AionUi Custom Agent setup documentation
 - [x] cross-platform ACP import/executable CI checks
+- [x] subprocess-level ACP initialize/session/prompt regression test
 
 Next ACP hardening:
 
-- [ ] subprocess-level ACP handshake integration test
 - [ ] session resume/load once required by the target AionUi ACP surface
 - [ ] provider-native cancellation for real model adapters
 - [ ] ACP permission-request mapping for capabilities that require interactive operator approval
