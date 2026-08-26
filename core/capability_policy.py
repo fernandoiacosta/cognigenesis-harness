@@ -5,6 +5,8 @@ from core.model_profile import TrustTier
 
 CAPABILITY_MINIMUM_TIERS: dict[str, TrustTier] = {
     "core.": TrustTier.OBSERVER,
+    "web.search": TrustTier.OBSERVER,
+    "web.fetch": TrustTier.OBSERVER,
     "filesystem.read": TrustTier.BASIC,
     "filesystem.list": TrustTier.BASIC,
     "filesystem.write": TrustTier.TRUSTED,
