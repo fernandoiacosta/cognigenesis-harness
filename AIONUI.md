@@ -1,6 +1,6 @@
 # AionUi Integration
 
-Cognigenesis Harness v0.4.0 is a Python-native ACP agent backed by Ollama by default.
+Cognigenesis Harness v0.5.0 is a Python-native ACP agent backed by Ollama by default, with persistent multi-turn conversation context per ACP session.
 
 ## Install / upgrade
 
@@ -17,7 +17,7 @@ cogni --version
 where.exe cogni-acp
 ```
 
-Expected version: `cognigenesis-harness 0.4.0`.
+Expected version: `cognigenesis-harness 0.5.0`.
 
 ## Ollama setup
 
@@ -33,7 +33,7 @@ Pull the default model if needed:
 ollama pull llama3.1:8b
 ```
 
-Or use another installed model, for example:
+Or use another installed model:
 
 ```powershell
 $env:COGNI_OLLAMA_MODEL = "hasi-edge-AG:latest"
@@ -50,15 +50,16 @@ COGNI_OLLAMA_TIMEOUT=120
 
 ## Test in the terminal first
 
+One-shot:
+
 ```powershell
 cogni --provider ollama --model llama3.1:8b "Say OK"
 ```
 
-Or, using environment configuration:
+Interactive chat:
 
 ```powershell
-$env:COGNI_OLLAMA_MODEL = "hasi-edge-AG:latest"
-cogni "Say OK"
+cogni chat --provider ollama --model llama3.1:8b --workspace .
 ```
 
 ## Configure AionUi Custom Agent
@@ -91,8 +92,6 @@ assets/brand/theme.json
 assets/brand/theme.css
 ```
 
-The AionUi host controls the surrounding application theme; the Cognigenesis theme defines Cognigenesis-owned surfaces, launchers, dashboards, future ACP UI, and supporting documentation.
-
 If AionUi does not inherit your shell environment, add these in the agent's **Environment Variables** section:
 
 ```text
@@ -104,11 +103,35 @@ COGNI_OLLAMA_TIMEOUT=120
 
 Use a model name shown by `ollama list`.
 
+## Persistent ACP conversation context
+
+Each AionUi conversation owns one Cognigenesis `ExecutionEngine`. Repeated `session/prompt` calls reuse that engine and therefore preserve prior user/assistant turns in model context.
+
+```text
+session/new
+  ↓
+engine created
+  ↓
+prompt 1 → history retained
+  ↓
+prompt 2 → prior turn included
+  ↓
+prompt 3 → prior turns included
+```
+
+This is real multi-turn context, not just shared files or a changing state snapshot.
+
+Each ACP session also gets isolated runtime state under:
+
+```text
+<project>/.cognigenesis/sessions/<session-id>.json
+```
+
 ## Windows spawn behavior
 
 `cogni-acp` is a Python-native ACP stdio server. It does not spawn a Node `.cmd` wrapper during `session/prompt`, avoiding the Windows `spawn EINVAL` failure mode seen with wrapper-based bridges.
 
-The package entry point launches Python code directly. The ACP regression test also launches the bridge with `sys.executable`, `-m`, `acp_bridge` as an argument array rather than through a `.cmd` shell wrapper.
+The package entry point launches Python code directly. The ACP regression test launches the bridge with `sys.executable`, `-m`, `acp_bridge` as an argument array rather than through a `.cmd` shell wrapper.
 
 ## ACP lifecycle
 
@@ -121,19 +144,13 @@ session/new
   ↓
 session/prompt
   ↓
-Cognigenesis execution kernel
+Cognigenesis execution kernel + conversation history
   ↓
 Ollama /api/chat
   ↓
 session/update
   ↓
 end_turn
-```
-
-Each ACP session gets isolated state under:
-
-```text
-<project>/.cognigenesis/sessions/<session-id>.json
 ```
 
 ## Actionable provider errors
