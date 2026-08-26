@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from threading import Event
 
+from cognigenesis.profiles import load_profile
 from core.context import ContextCompiler
 from core.engine import ExecutionEngine
 from core.policy import Policy
@@ -38,10 +39,9 @@ def build_engine(
     provider = build_provider(provider_name, model=model, base_url=base_url, timeout=timeout)
     provider_id, model_id = provider_identity(provider)
 
-    # New models start conservatively restricted until provider-specific
-    # qualification evidence promotes them. Read-only web search/fetch are
-    # allowed at observer tier; mutation remains trust-gated.
-    model_profile = conservative_profile(provider_id, model_id)
+    # Persisted qualification evidence can promote a model. Unknown/new model
+    # identifiers always fall back to the conservative profile.
+    model_profile = load_profile(provider_id, model_id) or conservative_profile(provider_id, model_id)
     policy = Policy(workspace=workspace, model_profile=model_profile)
     compiler = ContextCompiler(workspace=workspace, registry=registry, state=state)
 
@@ -58,7 +58,7 @@ def build_engine(
 
 def main() -> None:
     configure_utf8_stdio()
-    parser = argparse.ArgumentParser(description="Cognigenesis minimal agent harness")
+    parser = argparse.ArgumentParser(description="Cognigenesis Harness direct runner")
     parser.add_argument("objective", help="Objective for the harness")
     parser.add_argument("--workspace", default="workspace", help="Sandbox workspace directory")
     parser.add_argument("--provider", default=None, choices=["ollama", "stub"])
@@ -69,7 +69,6 @@ def main() -> None:
 
     workspace = Path(args.workspace).resolve()
     workspace.mkdir(parents=True, exist_ok=True)
-
     engine = build_engine(
         workspace,
         provider_name=args.provider,
