@@ -1,5 +1,7 @@
 # Cognigenesis Harness
 
+![Cognigenesis logo](assets/brand/cognigenesis-logo.svg)
+
 A minimal, extensible agent runtime built around one central principle:
 
 > Keep the execution kernel extremely small. Move cognition, procedures, and growth outward into composable capabilities and Markdown control documents.
@@ -98,6 +100,20 @@ COGNI_OLLAMA_TIMEOUT=120
 The ACP bridge is Python-native and does not launch Node `.cmd` wrappers during `session/prompt`, avoiding the Windows `spawn EINVAL` workaround that was previously required.
 
 See [`AIONUI.md`](AIONUI.md).
+
+## Brand and theme
+
+Canonical brand assets live under:
+
+```text
+assets/brand/cognigenesis-logo.svg
+assets/brand/theme.json
+assets/brand/theme.css
+```
+
+The theme is a dark Cognigenesis interface system built around cyan reasoning, violet tool execution, and magenta artifact/evolution states.
+
+See [`BRANDING.md`](BRANDING.md) for palette, usage rules, raster export sizes, and AionUi avatar setup.
 
 ## Model alignment and authority
 
