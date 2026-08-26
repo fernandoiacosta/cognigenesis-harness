@@ -4,19 +4,22 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cognigenesis-harness"
-version = "0.2.0"
-description = "Minimal extensible agent runtime with a Markdown cognitive control plane and trust-gated capabilities."
-requires-python = ">=3.11"
-dependencies = []
+version = "0.3.0"
+description = "Minimal extensible agent runtime with a Markdown cognitive control plane, trust-gated capabilities, and ACP stdio support."
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "agent-client-protocol>=0.12.1,<0.13",
+]
 
 [project.scripts]
 cogni = "cli:main"
+cogni-acp = "acp_bridge:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
 [tool.setuptools]
-py-modules = ["cli", "harness"]
+py-modules = ["cli", "harness", "acp_bridge"]
 
 [tool.setuptools.packages.find]
 include = ["core*", "providers*", "state*", "tools*"]
