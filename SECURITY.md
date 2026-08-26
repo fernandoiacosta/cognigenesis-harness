@@ -19,9 +19,37 @@ Unknown or unqualified models default to restricted authority. A strong harness 
 
 Qualification is a risk-control mechanism, not proof of universal model alignment. Provider-specific evaluations must be run and updated as models change.
 
+## ACP / AionUi Transport Boundary
+
+`cogni-acp` is a transport adapter, not an authority adapter.
+
+AionUi launches Cognigenesis as an ACP subprocess and supplies the user-selected project directory as the session working directory. The ACP bridge may also receive additional directory descriptors or MCP server descriptors from a client; these are **not automatically registered as Cognigenesis capabilities**.
+
+The authority path remains:
+
+```text
+ACP client
+  ↓
+ACP stdio bridge
+  ↓
+Execution Kernel
+  ↓
+Runtime Policy + Model Trust Gate
+  ↓
+Capability Registry
+```
+
+ACP owns stdout for the lifetime of `cogni-acp`. Human-readable banners, debug prints, or other non-protocol stdout output can corrupt the JSON-RPC stream and must not be added to the ACP entry point. Diagnostics should use stderr or structured ACP updates.
+
+Each ACP conversation receives a session-specific state file under `.cognigenesis/sessions/` so multiple conversations in the same project do not overwrite one shared runtime state document.
+
+ACP cancellation is cooperative. The kernel checks the cancellation signal before model steps and before capability execution. A blocking provider or capability cannot be forcibly interrupted until control returns to the kernel; provider-specific adapters should implement native cancellation where available.
+
 ## Filesystem
 
 All built-in filesystem and workspace operations resolve paths relative to the configured workspace and reject traversal outside it.
+
+For ACP sessions, that workspace is the project directory selected by the client/user when the session is created.
 
 ## Shell
 
