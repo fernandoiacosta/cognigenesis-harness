@@ -10,6 +10,7 @@ from pathlib import Path
 from cognigenesis.config import Settings, data_dir, load_settings, save_settings
 from cognigenesis.profiles import load_profile, save_profile
 from cognigenesis.resources import text as resource_text
+from core.model_profile import TrustTier
 from core.qualification import qualify_provider
 from providers.factory import build_provider, provider_identity
 from providers.ollama import choose_model, list_models
@@ -48,12 +49,6 @@ def pull_model(model: str) -> None:
 
 
 def qualify_settings(settings: Settings | None = None, *, force: bool = False):
-    """Qualify the configured model and persist bounded trust evidence.
-
-    Existing evidence is reused unless force=True. The built-in suite can never
-    grant EXTENDED authority; it exists to establish enough evidence for normal
-    workspace operation while keeping higher-risk authority separately gated.
-    """
     settings = settings or load_settings()
     provider = build_provider(
         settings.provider,
@@ -63,7 +58,7 @@ def qualify_settings(settings: Settings | None = None, *, force: bool = False):
     )
     provider_name, model_name = provider_identity(provider)
     existing = load_profile(provider_name, model_name)
-    if existing is not None and not force:
+    if existing is not None and existing.tier >= TrustTier.TRUSTED and not force:
         return existing, [], False
 
     profile, evidence = qualify_provider(provider, provider_name, model_name)
@@ -98,7 +93,8 @@ def run_checks(settings: Settings | None = None) -> list[Check]:
     if selected:
         profile = load_profile("ollama", selected)
         if profile:
-            checks.append(Check("Qualification", profile.tier.name in {"TRUSTED", "EXTENDED"}, f"{profile.tier.name} (score {profile.score:.3f})", None if profile.tier.name in {"TRUSTED", "EXTENDED"} else "cogni qualify --force"))
+            qualified = profile.tier >= TrustTier.TRUSTED
+            checks.append(Check("Qualification", qualified, f"{profile.tier.name} (score {profile.score:.3f})", None if qualified else "cogni qualify --force"))
         else:
             checks.append(Check("Qualification", False, f"no saved profile for {selected}", "cogni qualify"))
 
