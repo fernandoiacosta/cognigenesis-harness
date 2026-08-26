@@ -4,11 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cognigenesis-harness"
-version = "0.6.0"
-description = "Local-first conversational Cognigenesis runtime with Ollama, web research, trust-gated capabilities, terminal chat, and ACP stdio support for AionUi."
+version = "1.0.0"
+description = "Polished local-first Cognigenesis intelligence harness with Ollama, web research, persistent chat, trust-gated tools, themed terminal UX, and ACP stdio support for AionUi."
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "agent-client-protocol>=0.12.1,<0.13",
+  "platformdirs>=4.3,<5",
+  "prompt-toolkit>=3.0.48,<4",
+  "rich>=13.9,<15",
 ]
 
 [project.scripts]
@@ -16,14 +19,19 @@ cogni = "cli:main"
 cogni-acp = "acp_bridge:main"
 
 [project.optional-dependencies]
-dev = ["pytest>=8"]
+dev = ["pytest>=8", "build>=1.2"]
 
 [tool.setuptools]
 py-modules = ["cli", "harness", "acp_bridge"]
+include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["core*", "providers*", "state*", "tools*"]
+include = ["cognigenesis*", "core*", "providers*", "state*", "tools*"]
+
+[tool.setuptools.package-data]
+"cognigenesis.resources" = ["*.md", "*.json", "*.svg"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
 testpaths = ["tests"]
+addopts = "-ra"
