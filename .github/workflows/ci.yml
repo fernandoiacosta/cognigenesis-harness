@@ -11,7 +11,7 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ['3.11', '3.12', '3.13']
+        python-version: ['3.11', '3.12', '3.13', '3.14']
 
     runs-on: ${{ matrix.os }}
 
@@ -28,5 +28,11 @@ jobs:
       - name: Run tests
         run: python -m pytest -q
 
-      - name: Verify CLI
+      - name: Verify human CLI
         run: cogni --version
+
+      - name: Verify ACP package import
+        run: python -c "import acp; import acp_bridge; print(acp_bridge.CognigenesisAcpAgent.__name__)"
+
+      - name: Verify ACP executable is installed
+        run: python -c "import shutil; assert shutil.which('cogni-acp'), 'cogni-acp not found on PATH'"
