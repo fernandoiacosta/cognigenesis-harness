@@ -1,7 +1,16 @@
 runtime:
   max_steps: 12
   default_mode: architect
-  provider: stub
+  provider: ollama
+
+ollama:
+  base_url: http://127.0.0.1:11434
+  model: llama3.1:8b
+  timeout: 120
+  env:
+    base_url: COGNI_OLLAMA_BASE_URL
+    model: COGNI_OLLAMA_MODEL
+    timeout: COGNI_OLLAMA_TIMEOUT
 
 workspace:
   root: workspace
