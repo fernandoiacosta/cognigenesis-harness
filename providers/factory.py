@@ -2,12 +2,7 @@ from __future__ import annotations
 
 from cognigenesis.config import load_settings
 from providers.base import ModelProvider, StubProvider
-from providers.ollama import (
-    DEFAULT_OLLAMA_MODEL,
-    OllamaProvider,
-    choose_model,
-    list_models,
-)
+from providers.ollama import DEFAULT_OLLAMA_MODEL, OllamaProvider
 
 
 def build_provider(
@@ -20,16 +15,9 @@ def build_provider(
     name = (provider or settings.provider or "ollama").strip().lower()
 
     if name == "ollama":
-        resolved_base = (base_url or settings.ollama_base_url).rstrip("/")
-        resolved_model = model or settings.model
-        if not resolved_model:
-            try:
-                resolved_model = choose_model(list_models(resolved_base, timeout=2.5))
-            except Exception:
-                resolved_model = None
         return OllamaProvider(
-            model=resolved_model or DEFAULT_OLLAMA_MODEL,
-            base_url=resolved_base,
+            model=model or settings.model or DEFAULT_OLLAMA_MODEL,
+            base_url=(base_url or settings.ollama_base_url).rstrip("/"),
             timeout=float(timeout if timeout is not None else settings.ollama_timeout),
         )
     if name == "stub":
