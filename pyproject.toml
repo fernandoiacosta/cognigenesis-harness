@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cognigenesis-harness"
-version = "0.5.0"
-description = "Local-first conversational Cognigenesis runtime with Ollama, trust-gated capabilities, terminal chat, and ACP stdio support for AionUi."
+version = "0.6.0"
+description = "Local-first conversational Cognigenesis runtime with Ollama, web research, trust-gated capabilities, terminal chat, and ACP stdio support for AionUi."
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "agent-client-protocol>=0.12.1,<0.13",
