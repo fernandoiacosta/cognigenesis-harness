@@ -30,6 +30,15 @@ def register_filesystem_tools(registry: CapabilityRegistry, workspace: Path) -> 
             return []
         return sorted(str(item.relative_to(workspace)) for item in path.rglob("*") if item.is_file())
 
-    registry.register(Capability("filesystem.read", "Read a UTF-8 file inside the workspace.", read_file))
-    registry.register(Capability("filesystem.write", "Write a UTF-8 file inside the workspace.", write_file))
-    registry.register(Capability("filesystem.list", "List files inside the workspace.", list_files))
+    registry.register(Capability(
+        "filesystem.read", "Read a UTF-8 file inside the workspace.", read_file,
+        parameters={"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":False},
+    ))
+    registry.register(Capability(
+        "filesystem.write", "Write a UTF-8 file inside the workspace.", write_file,
+        parameters={"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path"],"additionalProperties":False},
+    ))
+    registry.register(Capability(
+        "filesystem.list", "List files recursively inside the workspace.", list_files,
+        parameters={"type":"object","properties":{"path":{"type":"string","default":"."}},"additionalProperties":False},
+    ))
