@@ -1,125 +1,131 @@
 # AionUi Integration
 
-Cognigenesis can run in AionUi in two ways:
+Cognigenesis Harness v0.4.0 is a Python-native ACP agent backed by Ollama by default.
 
-1. **Skill/launcher mode** — AionUi invokes Cognigenesis as an imported skill or external launcher.
-2. **First-class custom agent mode** — AionUi spawns `cogni-acp` as an ACP-compliant agent over stdio.
+## Install / upgrade
 
-The second mode is implemented by `acp_bridge.py` and is the preferred path when Cognigenesis should appear alongside other AionUi agents.
-
-## Why the plain CLI failed
-
-The normal `cogni` command is a human-facing CLI. It reads command-line arguments and prints a final result.
-
-AionUi Custom Agents expect an Agent Client Protocol (ACP) process. AionUi launches the agent as a subprocess and communicates over stdin/stdout using ACP JSON-RPC messages such as:
-
-```text
-initialize
-↓
-session/new
-↓
-session/prompt
-↓
-session/update
-↓
-session/prompt response
-```
-
-Registering the plain `cogni` CLI as a custom agent therefore fails during ACP initialization.
-
-## ACP entry point
-
-After installing Cognigenesis Harness v0.3.0 or later:
-
-```bash
-cogni-acp
-```
-
-`cogni-acp` is not an interactive terminal command. It is a stdio protocol server intended to be launched by an ACP client such as AionUi.
-
-Do not add banners or normal stdout logging to this entry point. ACP owns stdout.
-
-## Add Cognigenesis to AionUi
-
-In AionUi:
-
-1. Open **Settings → Agent Management → Custom Agents**.
-2. Add a custom agent.
-3. Set the display name to `Cognigenesis`.
-4. Set the command to:
-
-   ```text
-   cogni-acp
-   ```
-
-5. Leave arguments empty.
-6. Save the agent.
-7. Start a new AionUi conversation and choose Cognigenesis.
-8. Select the project/working directory for the conversation.
-
-AionUi passes that selected directory to Cognigenesis as the ACP session working directory.
-
-## PATH verification
-
-If AionUi cannot find the agent, verify from a fresh terminal:
-
-macOS/Linux:
-
-```bash
-which cogni-acp
-```
-
-Windows:
+Because this repository is private, install from an authenticated Git checkout:
 
 ```powershell
+python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
+```
+
+Verify:
+
+```powershell
+cogni --version
 where.exe cogni-acp
 ```
 
-Then restart AionUi so it inherits the updated PATH.
+Expected version: `cognigenesis-harness 0.4.0`.
 
-## Session isolation
+## Ollama setup
 
-Each ACP conversation receives:
+Verify Ollama is running and inspect local models:
 
-- its own ACP session ID
-- its own execution engine instance
-- its own cancellation signal
-- its own state file under:
+```powershell
+ollama list
+```
+
+Pull the default model if needed:
+
+```powershell
+ollama pull llama3.1:8b
+```
+
+Or use another installed model, for example:
+
+```powershell
+$env:COGNI_OLLAMA_MODEL = "hasi-edge-AG:latest"
+```
+
+Supported environment variables:
+
+```text
+COGNI_PROVIDER=ollama
+COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+COGNI_OLLAMA_MODEL=llama3.1:8b
+COGNI_OLLAMA_TIMEOUT=120
+```
+
+## Test in the terminal first
+
+```powershell
+cogni --provider ollama --model llama3.1:8b "Say OK"
+```
+
+Or, using environment configuration:
+
+```powershell
+$env:COGNI_OLLAMA_MODEL = "hasi-edge-AG:latest"
+cogni "Say OK"
+```
+
+## Configure AionUi Custom Agent
+
+Open **Settings → Agent Management → Custom Agents** and use:
+
+```text
+Display Name: Cognigenesis
+Command: cogni-acp
+Arguments: <leave empty>
+```
+
+If AionUi does not inherit your shell environment, add these in the agent's **Environment Variables** section:
+
+```text
+COGNI_PROVIDER=ollama
+COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+COGNI_OLLAMA_MODEL=hasi-edge-AG:latest
+COGNI_OLLAMA_TIMEOUT=120
+```
+
+Use a model name shown by `ollama list`.
+
+## Windows spawn behavior
+
+`cogni-acp` is a Python-native ACP stdio server. It does not spawn a Node `.cmd` wrapper during `session/prompt`, avoiding the Windows `spawn EINVAL` failure mode seen with wrapper-based bridges.
+
+The package entry point launches Python code directly. The ACP regression test also launches the bridge with `sys.executable`, `-m`, `acp_bridge` as an argument array rather than through a `.cmd` shell wrapper.
+
+## ACP lifecycle
+
+```text
+AionUi
+  ↓ spawn cogni-acp
+initialize
+  ↓
+session/new
+  ↓
+session/prompt
+  ↓
+Cognigenesis execution kernel
+  ↓
+Ollama /api/chat
+  ↓
+session/update
+  ↓
+end_turn
+```
+
+Each ACP session gets isolated state under:
 
 ```text
 <project>/.cognigenesis/sessions/<session-id>.json
 ```
 
-The project workspace is shared intentionally; runtime session state is not.
+## Actionable provider errors
 
-## Capability boundary
-
-ACP transport does not bypass Cognigenesis governance.
-
-AionUi may provide a working directory, additional directories, or MCP server descriptors during session setup. Cognigenesis does **not** automatically grant those as executable authority.
-
-The existing Cognigenesis policy and model-trust gates remain authoritative.
+If Ollama is down, Cognigenesis reports:
 
 ```text
-AionUi
-  ↓
-ACP stdio
-  ↓
-Cognigenesis ACP bridge
-  ↓
-Execution Kernel
-  ↓
-Policy + Model Trust Gate
-  ↓
-Capability Registry
+Provider error: Ollama is not reachable at http://127.0.0.1:11434. Start Ollama and verify it with: ollama list
 ```
 
-## Cancellation
+If the configured model is missing, Cognigenesis reports the model and suggests:
 
-ACP `session/cancel` sets a cooperative cancellation signal in the Cognigenesis execution kernel. The kernel checks cancellation before model steps and before capability execution.
+```text
+ollama pull <model>
+```
 
-This prevents Cognigenesis from advertising cancellation while ignoring it. A blocking provider or tool call can still only stop when control returns to the kernel; future provider adapters should support provider-native cancellation where available.
-
-## Current limitation
-
-The ACP bridge solves the AionUi transport/integration problem. It does not change the current model-provider status: the repository still defaults to the deterministic stub provider until a real, qualified provider adapter is enabled.
+Known provider failures are returned to AionUi as agent messages with a normal ACP `end_turn` instead of leaking an opaque internal error whenever possible.
