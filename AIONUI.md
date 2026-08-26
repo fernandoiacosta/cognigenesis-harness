@@ -71,6 +71,28 @@ Command: cogni-acp
 Arguments: <leave empty>
 ```
 
+### Logo
+
+Use the Cognigenesis brand mark instead of the generic robot avatar.
+
+Canonical source:
+
+```text
+assets/brand/cognigenesis-logo.svg
+```
+
+AionUi's Custom Agent form exposes **Upload image**. Export the SVG to a 512×512 PNG and upload that PNG as the agent image.
+
+Branding source of truth:
+
+```text
+BRANDING.md
+assets/brand/theme.json
+assets/brand/theme.css
+```
+
+The AionUi host controls the surrounding application theme; the Cognigenesis theme defines Cognigenesis-owned surfaces, launchers, dashboards, future ACP UI, and supporting documentation.
+
 If AionUi does not inherit your shell environment, add these in the agent's **Environment Variables** section:
 
 ```text
