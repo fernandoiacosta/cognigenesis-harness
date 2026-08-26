@@ -1,150 +1,72 @@
 # Roadmap
 
-## v0.3 — ACP / AionUi Bridge
+## v1.0 — Productized Local-First Harness
 
-Completed:
+Shipped:
 
-- [x] ACP-over-stdio bridge using the current Python ACP SDK
-- [x] `cogni-acp` package entry point
-- [x] ACP initialization support
-- [x] ACP session creation
-- [x] prompt → Cognigenesis objective translation
-- [x] agent-message updates back to ACP clients
-- [x] cooperative `session/cancel` handling
-- [x] per-session state isolation inside a shared project workspace
-- [x] client-supplied additional directories/MCP descriptors kept outside automatic authority
-- [x] AionUi Custom Agent setup documentation
-- [x] cross-platform ACP import/executable CI checks
-- [x] subprocess-level ACP initialize/session/prompt regression test
+- [x] real Ollama provider
+- [x] persistent multi-turn terminal chat
+- [x] durable conversation state across process restarts
+- [x] canonical assistant/tool transcript ordering
+- [x] strict tool JSON schemas
+- [x] read-only web research
+- [x] public-network-only `web.fetch` boundary
+- [x] trust-gated capability execution
+- [x] shell disabled by default
+- [x] Python-native ACP-over-stdio agent
+- [x] AionUi first-class custom-agent path
+- [x] Windows UTF-8 hardening
+- [x] Windows `.cmd`/spawn workaround eliminated from prompt execution
+- [x] `cogni setup`
+- [x] `cogni doctor`
+- [x] `cogni config`
+- [x] `cogni aionui`
+- [x] Prime Dark terminal theme
+- [x] packaged logo/theme/control-plane resources
+- [x] one cross-platform persisted configuration source
+- [x] verified Windows/macOS/Linux installers
+- [x] wheel/sdist packaging validation in CI
+- [x] ACP subprocess smoke tests
+- [x] state corruption recovery and atomic writes
 
-Next ACP hardening:
+## Optional post-v1 extensions
 
-- [ ] session resume/load once required by the target AionUi ACP surface
-- [ ] provider-native cancellation for real model adapters
-- [ ] ACP permission-request mapping for capabilities that require interactive operator approval
-- [ ] streaming model output as incremental ACP message chunks
+These are enhancements, not prerequisites for a workable harness:
 
-## v0.2 — Installation + Trust Gate
+### Provider breadth
 
-Completed:
+- OpenAI provider adapter
+- Anthropic provider adapter
+- additional local providers
+- provider-native streaming/cancellation
 
-- [x] installable `cogni` CLI
-- [x] macOS/Linux installer
-- [x] Windows PowerShell installer
-- [x] private-repository authenticated installation path
-- [x] `ModelProfile`
-- [x] model trust tiers
-- [x] per-capability minimum trust tiers
-- [x] runtime-policy + model-trust dual gating
-- [x] conservative default profile for unknown models
-- [x] single authoritative capability-policy source
+### Research breadth
 
-Still required before claiming measured model alignment:
+- pluggable search backends (Brave/Tavily/Serper/etc.)
+- source ranking/provenance ledger
+- structured citation objects
 
-- [ ] provider-specific qualification runners
-- [ ] persisted evaluation evidence and profile provenance
-- [ ] regression suites when provider/model versions change
-- [ ] adversarial tool-use qualification cases
+### ACP breadth
 
-## Milestone 1 — Prove the Foundation
+- session resume/load if AionUi requires it
+- interactive ACP permission requests
+- incremental streaming ACP updates
 
-Do not add swarm orchestration, giant memory systems, or autonomous code mutation yet.
+### Qualified model promotion
 
-Required path:
+- provider/model-version-specific evaluation runners
+- persisted qualification evidence
+- adversarial tool-use qualification
+- automatic trust downgrade on regression
 
-```text
-agent.md
-↓
-load Markdown graph
-↓
-qualified real model provider
-↓
-capability registry
-↓
-workspace capability
-↓
-recursive execution
-↓
-goal tracking
-↓
-session log
-```
+### Governed extension system
 
-### Acceptance test
+- extension proposals
+- static validation
+- sandbox tests
+- permission analysis
+- promotion/rollback
 
-```bash
-cogni "Create a Python CLI project for tracking expenses"
-```
+## Non-negotiable architectural constraint
 
-Success means the runtime can load Architect mode, create a goal, inspect workspace state, generate a project plan, call `workspace.create_project`, run tests through `shell.run`, observe the result, mark the goal complete, and persist the session.
-
-## Milestone 2 — Qualified Provider Bus
-
-- [ ] OpenAI adapter
-- [ ] Anthropic adapter
-- [ ] Ollama adapter
-- [ ] normalized tool-call schema
-- [ ] provider switching without kernel changes
-- [ ] qualification run before mutation authority
-- [ ] profile provenance tied to provider/model version
-
-## Milestone 3 — Markdown Graph
-
-- [ ] front-matter metadata
-- [ ] mode selection
-- [ ] protocol selection
-- [ ] skill discovery
-- [ ] selective context compilation
-- [ ] working/project memory loading
-
-## Milestone 4 — State Continuity
-
-- [ ] goals API
-- [ ] session JSONL
-- [ ] checkpoints
-- [ ] artifact ledger
-- [ ] explicit next-action state
-
-## Milestone 5 — Semantic Capabilities
-
-- [ ] richer workspace manager
-- [ ] repository operations
-- [ ] artifact abstractions
-- [ ] bounded shell policy
-- [ ] capability introspection tool
-
-## Milestone 6 — Capability-Gap Evolution
-
-Only start after Milestone 1 is reliable and provider qualification is enforced.
-
-Target test:
-
-```bash
-cogni "Inspect this SQLite database and create an HTML report"
-```
-
-Expected behavior:
-
-```text
-discover sqlite capability missing
-→ test existing compositions
-→ declare CAPABILITY_GAP
-→ propose extension
-→ static validation
-→ sandbox
-→ tests
-→ permission analysis
-→ model trust analysis
-→ registration
-→ retry original goal
-→ create artifact
-→ mark goal complete
-```
-
-## Architectural Constraint
-
-Kernel complexity should grow slowly.
-
-Capability space may grow rapidly.
-
-Authority should grow only with evidence.
+> Kernel complexity should grow slowly. Capability space may grow rapidly. Authority grows only with evidence.
