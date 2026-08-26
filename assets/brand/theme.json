@@ -1,0 +1,38 @@
+{
+  "name": "Cognigenesis Prime Dark",
+  "version": "1.0.0",
+  "appearance": "dark",
+  "colors": {
+    "background": "#05070D",
+    "surface": "#0B1020",
+    "surfaceElevated": "#11182B",
+    "border": "#1B2440",
+    "textPrimary": "#F3F7FF",
+    "textSecondary": "#A7B0C3",
+    "textMuted": "#6F7B92",
+    "accentPrimary": "#62F5FF",
+    "accentSecondary": "#8B7CFF",
+    "accentTertiary": "#C96CFF",
+    "success": "#54E6A8",
+    "warning": "#FFC857",
+    "danger": "#FF6B7A"
+  },
+  "effects": {
+    "glow": "rgba(98,245,255,0.24)",
+    "panelBlur": 18,
+    "panelOpacity": 0.88,
+    "radius": 18,
+    "focusRing": "#62F5FF"
+  },
+  "typography": {
+    "ui": "Inter, ui-sans-serif, system-ui, sans-serif",
+    "mono": "JetBrains Mono, Cascadia Code, ui-monospace, monospace"
+  },
+  "semantic": {
+    "thought": "#62F5FF",
+    "tool": "#8B7CFF",
+    "artifact": "#C96CFF",
+    "success": "#54E6A8",
+    "blocked": "#FF6B7A"
+  }
+}
