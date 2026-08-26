@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from threading import Event
 
 from core.context import ContextCompiler
 from core.engine import ExecutionEngine
@@ -15,7 +16,7 @@ from tools.shell import register_shell_tools
 from tools.workspace import register_workspace_tools
 
 
-def build_engine(workspace: Path) -> ExecutionEngine:
+def build_engine(workspace: Path, cancel_event: Event | None = None) -> ExecutionEngine:
     registry = CapabilityRegistry()
     register_filesystem_tools(registry, workspace)
     register_shell_tools(registry, workspace)
@@ -37,6 +38,7 @@ def build_engine(workspace: Path) -> ExecutionEngine:
         context_compiler=compiler,
         state=state,
         max_steps=12,
+        cancel_event=cancel_event,
     )
 
 
