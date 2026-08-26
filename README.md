@@ -9,7 +9,7 @@ A minimal, extensible agent runtime built around one central principle:
 ## Runtime architecture
 
 ```text
-objective
+objective / conversation turn
   ↓
 Markdown control plane
   ↓
@@ -26,9 +26,48 @@ capability registry
 observation / repeat
 ```
 
-## v0.4.0: real Ollama execution
+## v0.5.0: persistent conversation sessions
 
-Normal execution is now **Ollama-backed by default**. `StubProvider` remains available only when explicitly selected for tests/demo mode.
+Cognigenesis now supports true multi-turn terminal chat and persistent ACP conversation context.
+
+Interactive terminal mode:
+
+```powershell
+cogni chat --provider ollama --model llama3.1:8b --workspace .
+```
+
+Example:
+
+```text
+Cognigenesis Harness 0.5.0
+Provider:  ollama
+Model:     llama3.1:8b
+Workspace: C:\project
+
+You > inspect this repository
+Cogni > ...
+
+You > now focus on the provider layer
+Cogni > ...
+```
+
+Chat commands:
+
+```text
+/help          Show commands
+/new           Clear conversational context
+/state         Show runtime state
+/capabilities  List registered capabilities
+/provider      Show provider/model
+/workspace     Show workspace
+/exit          Leave chat
+```
+
+The same `ExecutionEngine` now retains prior user/assistant turns across repeated `run()` calls, so AionUi ACP sessions also preserve real conversation context instead of behaving as unrelated one-shot prompts.
+
+## Ollama execution
+
+Normal execution is **Ollama-backed by default**. `StubProvider` remains available only when explicitly selected for tests/demo mode.
 
 Default Ollama settings:
 
@@ -57,7 +96,7 @@ where.exe cogni-acp
 ollama list
 ```
 
-## Terminal usage
+## One-shot terminal usage
 
 ```powershell
 cogni --provider ollama --model llama3.1:8b "Say OK"
@@ -67,7 +106,7 @@ Or configure once for the current shell:
 
 ```powershell
 $env:COGNI_OLLAMA_MODEL = "hasi-edge-AG:latest"
-cogni "Say OK"
+cogni chat --workspace .
 ```
 
 If Ollama is unavailable, Cognigenesis returns an actionable provider error. If the model is missing, it names the model and suggests `ollama pull <model>`.
@@ -111,9 +150,7 @@ assets/brand/theme.json
 assets/brand/theme.css
 ```
 
-The theme is a dark Cognigenesis interface system built around cyan reasoning, violet tool execution, and magenta artifact/evolution states.
-
-See [`BRANDING.md`](BRANDING.md) for palette, usage rules, raster export sizes, and AionUi avatar setup.
+See [`BRANDING.md`](BRANDING.md).
 
 ## Model alignment and authority
 
@@ -127,6 +164,7 @@ CI runs on Ubuntu, macOS, and Windows across supported Python versions. It inclu
 
 - mocked Ollama HTTP response tests
 - explicit provider-selection tests
+- persistent conversation-history tests
 - ACP subprocess handshake/prompt smoke tests
 - Windows-safe Python argument-array launch path
 - optional live Ollama ACP round trip with `COGNI_TEST_OLLAMA=1`
