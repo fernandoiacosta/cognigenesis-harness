@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from threading import Event
+
 from core.context import ContextCompiler
 from core.policy import Policy
 from core.registry import CapabilityRegistry
@@ -16,6 +18,7 @@ class ExecutionEngine:
         context_compiler: ContextCompiler,
         state: StateStore,
         max_steps: int = 12,
+        cancel_event: Event | None = None,
     ) -> None:
         self.provider = provider
         self.registry = registry
@@ -23,14 +26,34 @@ class ExecutionEngine:
         self.context_compiler = context_compiler
         self.state = state
         self.max_steps = max_steps
+        self.cancel_event = cancel_event
+
+    def _is_cancelled(self) -> bool:
+        return bool(self.cancel_event and self.cancel_event.is_set())
+
+    def _cancelled_result(self, step: int | None = None) -> str:
+        payload: dict[str, int | str] = {"reason": "Execution cancelled by client."}
+        if step is not None:
+            payload["step"] = step
+        self.state.record_event("cancelled", payload)
+        return "Execution cancelled by client."
 
     def run(self, objective: str) -> str:
         history: list[dict] = []
         self.state.set_objective(objective)
 
+        if self._is_cancelled():
+            return self._cancelled_result()
+
         for step in range(1, self.max_steps + 1):
+            if self._is_cancelled():
+                return self._cancelled_result(step)
+
             context = self.context_compiler.compile(objective, history)
             response = self.provider.generate(context)
+
+            if self._is_cancelled():
+                return self._cancelled_result(step)
 
             if response.final is not None:
                 self.state.record_event("final", {"step": step, "text": response.final})
@@ -42,6 +65,9 @@ class ExecutionEngine:
                 return gap
 
             for call in response.tool_calls:
+                if self._is_cancelled():
+                    return self._cancelled_result(step)
+
                 capability = self.registry.get(call.name)
                 if capability is None:
                     observation = {
