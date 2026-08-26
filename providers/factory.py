@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import os
-
+from cognigenesis.config import load_settings
 from providers.base import ModelProvider, StubProvider
 from providers.ollama import (
-    DEFAULT_OLLAMA_BASE_URL,
     DEFAULT_OLLAMA_MODEL,
-    DEFAULT_OLLAMA_TIMEOUT,
     OllamaProvider,
+    choose_model,
+    list_models,
 )
 
 
@@ -17,13 +16,21 @@ def build_provider(
     base_url: str | None = None,
     timeout: float | None = None,
 ) -> ModelProvider:
-    name = (provider or os.getenv("COGNI_PROVIDER") or "ollama").strip().lower()
+    settings = load_settings()
+    name = (provider or settings.provider or "ollama").strip().lower()
 
     if name == "ollama":
+        resolved_base = (base_url or settings.ollama_base_url).rstrip("/")
+        resolved_model = model or settings.model
+        if not resolved_model:
+            try:
+                resolved_model = choose_model(list_models(resolved_base, timeout=2.5))
+            except Exception:
+                resolved_model = None
         return OllamaProvider(
-            model=model or os.getenv("COGNI_OLLAMA_MODEL") or DEFAULT_OLLAMA_MODEL,
-            base_url=base_url or os.getenv("COGNI_OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL,
-            timeout=float(timeout or os.getenv("COGNI_OLLAMA_TIMEOUT") or DEFAULT_OLLAMA_TIMEOUT),
+            model=resolved_model or DEFAULT_OLLAMA_MODEL,
+            base_url=resolved_base,
+            timeout=float(timeout if timeout is not None else settings.ollama_timeout),
         )
     if name == "stub":
         return StubProvider()
