@@ -2,37 +2,66 @@
 
 Cognigenesis Harness supports macOS, Linux, and Windows with Python 3.11–3.14.
 
-Because the repository is currently private, installation requires authenticated access to GitHub. Anonymous raw-file installers will only work after the project or installer is published.
+Because the repository is private, installation requires authenticated GitHub access.
 
-## Preferred package install
-
-If your Git credentials can access the private repository:
+## Direct pip install / upgrade
 
 ```bash
-uv tool install git+https://github.com/fernandoiacosta/cognigenesis-harness.git
+python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
+```
+
+Alternative isolated installs:
+
+```bash
+uv tool install --force git+https://github.com/fernandoiacosta/cognigenesis-harness.git
 ```
 
 or:
 
 ```bash
-pipx install git+https://github.com/fernandoiacosta/cognigenesis-harness.git
+pipx install --force git+https://github.com/fernandoiacosta/cognigenesis-harness.git
 ```
 
-The package installs two executables:
+The package installs:
 
 ```text
 cogni      Human-facing Cognigenesis CLI
-cogni-acp  ACP-over-stdio agent entry point for AionUi and other ACP clients
+cogni-acp  Python-native ACP-over-stdio agent for AionUi
 ```
 
-After installation:
+## Ollama
+
+Install/start Ollama separately, then verify:
 
 ```bash
-cogni --help
-cogni "Create a Python CLI project for tracking expenses"
+ollama list
 ```
 
-To verify the AionUi/ACP entry point is available:
+Pull a model if needed:
+
+```bash
+ollama pull llama3.1:8b
+```
+
+Configuration:
+
+```text
+COGNI_PROVIDER=ollama
+COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+COGNI_OLLAMA_MODEL=llama3.1:8b
+COGNI_OLLAMA_TIMEOUT=120
+```
+
+The model can be any name returned by `ollama list`, including custom models such as `hasi-edge-AG:latest`.
+
+## Verify terminal execution
+
+```bash
+cogni --version
+cogni --provider ollama --model llama3.1:8b "Say OK"
+```
+
+## Verify ACP executable
 
 macOS/Linux:
 
@@ -46,36 +75,6 @@ Windows:
 where.exe cogni-acp
 ```
 
-Do not expect `cogni-acp` to behave like an interactive terminal program. It waits for ACP JSON-RPC messages on stdin and writes protocol messages to stdout.
+`cogni-acp` is not interactive. It waits for ACP JSON-RPC on stdio and is intended to be spawned by AionUi or another ACP client.
 
-See [`AIONUI.md`](AIONUI.md) for AionUi Custom Agent configuration.
-
-## Authenticated one-liner — macOS/Linux
-
-With GitHub CLI installed and authenticated:
-
-```bash
-gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.sh -H "Accept: application/vnd.github.raw+json" | sh
-```
-
-## Authenticated one-liner — Windows PowerShell
-
-With GitHub CLI installed and authenticated:
-
-```powershell
-$script = gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.ps1 -H "Accept: application/vnd.github.raw+json"; Invoke-Expression ($script -join "`n")
-```
-
-## Future public one-liners
-
-Once the installer is publicly reachable, the intended UX is:
-
-```bash
-curl -fsSL <public-installer-url>/install.sh | sh
-```
-
-and:
-
-```powershell
-irm <public-installer-url>/install.ps1 | iex
-```
+See [`AIONUI.md`](AIONUI.md).
