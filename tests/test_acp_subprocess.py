@@ -3,21 +3,24 @@ import os
 import sys
 from typing import Any
 
-from acp import PROTOCOL_VERSION, spawn_agent_process, text_block
+from acp import Client, PROTOCOL_VERSION, RequestError, spawn_agent_process, text_block
 
 
-class BridgeTestClient:
+class BridgeTestClient(Client):
     def __init__(self) -> None:
         self.updates: list[dict[str, Any]] = []
 
+    async def request_permission(
+        self,
+        options: Any,
+        session_id: str,
+        tool_call: Any,
+        **kwargs: Any,
+    ) -> Any:
+        raise RequestError.method_not_found("session/request_permission")
+
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
         self.updates.append({"session_id": session_id, "update": update, **kwargs})
-
-    async def ext_method(self, method: str, params: dict) -> dict:
-        raise RuntimeError(f"Unexpected ACP extension method: {method}")
-
-    async def ext_notification(self, method: str, params: dict) -> None:
-        raise RuntimeError(f"Unexpected ACP extension notification: {method}")
 
 
 def test_acp_stdio_subprocess_handshake(tmp_path):
@@ -26,7 +29,7 @@ def test_acp_stdio_subprocess_handshake(tmp_path):
         env = os.environ.copy()
 
         async with spawn_agent_process(
-            client,  # type: ignore[arg-type]
+            client,
             sys.executable,
             "-m",
             "acp_bridge",
