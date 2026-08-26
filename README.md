@@ -42,7 +42,7 @@ See [`ALIGNMENT.md`](ALIGNMENT.md).
 
 ## Install
 
-Requires Python 3.11+.
+Requires Python 3.11–3.14.
 
 ### Private-repository one-liner — macOS/Linux
 
@@ -73,10 +73,46 @@ cogni "Inspect this workspace and summarize its architecture."
 
 See [`INSTALL.md`](INSTALL.md) for alternatives and the future public installer path.
 
+## AionUi first-class custom agent
+
+The regular `cogni` executable is a human-facing CLI. AionUi Custom Agents require ACP over stdio, so Cognigenesis now ships a separate ACP entry point:
+
+```text
+cogni-acp
+```
+
+In AionUi, add a custom agent under **Settings → Agent Management → Custom Agents** with:
+
+```text
+Display name: Cognigenesis
+Command:      cogni-acp
+Arguments:    <empty>
+```
+
+AionUi launches `cogni-acp` as a subprocess and communicates with it using Agent Client Protocol messages over stdin/stdout.
+
+The ACP bridge:
+
+- negotiates ACP initialization
+- creates isolated Cognigenesis sessions per AionUi conversation
+- uses the AionUi-selected project directory as the Cognigenesis workspace
+- translates ACP prompts into Cognigenesis objectives
+- streams the resulting agent message back through ACP session updates
+- supports cooperative ACP cancellation
+- preserves Cognigenesis policy and model-trust gates
+- does not automatically grant client-provided additional directories or MCP servers
+
+See [`AIONUI.md`](AIONUI.md) for setup and architecture details.
+
 ## Current status
 
-Version `0.2.0` adds:
+Version `0.3.0` adds:
 
+- first-class ACP-over-stdio bridge
+- `cogni-acp` executable for AionUi and other ACP clients
+- isolated ACP session state
+- cooperative execution cancellation
+- ACP bridge tests
 - installable `cogni` CLI
 - macOS/Linux installer
 - Windows PowerShell installer
