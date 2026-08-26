@@ -9,10 +9,12 @@ from core.engine import ExecutionEngine
 from core.policy import Policy
 from core.qualification import conservative_profile
 from core.registry import CapabilityRegistry
+from core.stdio import configure_utf8_stdio
 from providers.factory import build_provider, provider_identity
 from state.store import StateStore
 from tools.filesystem import register_filesystem_tools
 from tools.shell import register_shell_tools
+from tools.web import register_web_tools
 from tools.workspace import register_workspace_tools
 
 
@@ -29,6 +31,7 @@ def build_engine(
     registry = CapabilityRegistry()
     register_filesystem_tools(registry, workspace)
     register_shell_tools(registry, workspace)
+    register_web_tools(registry)
     register_workspace_tools(registry, workspace)
 
     state = StateStore(state_path or workspace / ".cognigenesis" / "state.json")
@@ -36,7 +39,8 @@ def build_engine(
     provider_id, model_id = provider_identity(provider)
 
     # New models start conservatively restricted until provider-specific
-    # qualification evidence promotes them.
+    # qualification evidence promotes them. Read-only web search/fetch are
+    # allowed at observer tier; mutation remains trust-gated.
     model_profile = conservative_profile(provider_id, model_id)
     policy = Policy(workspace=workspace, model_profile=model_profile)
     compiler = ContextCompiler(workspace=workspace, registry=registry, state=state)
@@ -53,6 +57,7 @@ def build_engine(
 
 
 def main() -> None:
+    configure_utf8_stdio()
     parser = argparse.ArgumentParser(description="Cognigenesis minimal agent harness")
     parser.add_argument("objective", help="Objective for the harness")
     parser.add_argument("--workspace", default="workspace", help="Sandbox workspace directory")
