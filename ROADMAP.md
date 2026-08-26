@@ -1,5 +1,29 @@
 # Roadmap
 
+## v0.3 — ACP / AionUi Bridge
+
+Completed:
+
+- [x] ACP-over-stdio bridge using the current Python ACP SDK
+- [x] `cogni-acp` package entry point
+- [x] ACP initialization support
+- [x] ACP session creation
+- [x] prompt → Cognigenesis objective translation
+- [x] agent-message updates back to ACP clients
+- [x] cooperative `session/cancel` handling
+- [x] per-session state isolation inside a shared project workspace
+- [x] client-supplied additional directories/MCP descriptors kept outside automatic authority
+- [x] AionUi Custom Agent setup documentation
+- [x] cross-platform ACP import/executable CI checks
+
+Next ACP hardening:
+
+- [ ] subprocess-level ACP handshake integration test
+- [ ] session resume/load once required by the target AionUi ACP surface
+- [ ] provider-native cancellation for real model adapters
+- [ ] ACP permission-request mapping for capabilities that require interactive operator approval
+- [ ] streaming model output as incremental ACP message chunks
+
 ## v0.2 — Installation + Trust Gate
 
 Completed:
