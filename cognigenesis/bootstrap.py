@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from urllib import error
 
-from cognigenesis.config import Settings, config_path, load_settings, save_settings
+from cognigenesis.config import Settings, data_dir, load_settings, save_settings
+from cognigenesis.resources import text as resource_text
 from providers.ollama import choose_model, list_models
 
 
@@ -26,6 +25,18 @@ def detect_legacy_aionui_bridge() -> Path | None:
         return None
     path = Path(appdata) / "AionUi" / "cognigenesis" / "cognigenesis_ollama.py"
     return path if path.exists() else None
+
+
+def install_brand_assets() -> dict[str, Path]:
+    brand_dir = data_dir() / "brand"
+    brand_dir.mkdir(parents=True, exist_ok=True)
+    outputs = {
+        "logo": brand_dir / "cognigenesis-logo.svg",
+        "theme": brand_dir / "theme.json",
+    }
+    outputs["logo"].write_text(resource_text("cognigenesis-logo.svg"), encoding="utf-8")
+    outputs["theme"].write_text(resource_text("theme.json"), encoding="utf-8")
+    return outputs
 
 
 def run_checks(settings: Settings | None = None) -> list[Check]:
@@ -57,6 +68,9 @@ def run_checks(settings: Settings | None = None) -> list[Check]:
         "packaged cogni-acp path" if legacy is None else f"legacy bridge detected: {legacy}",
         None if legacy is None else "Set AionUi Custom Agent command to cogni-acp with no arguments; then create a new conversation.",
     ))
+
+    assets = install_brand_assets()
+    checks.append(Check("Brand assets", assets["logo"].exists() and assets["theme"].exists(), str(assets["logo"])))
     return checks
 
 
@@ -77,16 +91,19 @@ def auto_setup(*, model: str | None = None, base_url: str | None = None, timeout
     if settings.model is None:
         settings.model = "llama3.1:8b"
     save_settings(settings)
+    install_brand_assets()
     return settings, run_checks(settings)
 
 
 def aionui_configuration(settings: Settings | None = None) -> dict:
     settings = settings or load_settings()
     executable = shutil.which("cogni-acp") or "cogni-acp"
+    assets = install_brand_assets()
     return {
         "display_name": "Cognigenesis",
         "command": executable,
         "arguments": [],
+        "image": str(assets["logo"]),
         "environment": {
             "COGNI_PROVIDER": settings.provider,
             "COGNI_OLLAMA_BASE_URL": settings.ollama_base_url,
