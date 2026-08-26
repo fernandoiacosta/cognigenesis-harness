@@ -4,10 +4,8 @@ from providers.ollama import OllamaProvider
 
 def test_engine_preserves_conversation_across_runs(tmp_path):
     engine = build_engine(tmp_path, provider_name="stub")
-
     first = engine.run("first turn")
     second = engine.run("second turn")
-
     assert "first turn" in first
     assert "second turn" in second
     history = engine.conversation_history()
@@ -16,12 +14,21 @@ def test_engine_preserves_conversation_across_runs(tmp_path):
     assert history[2]["content"] == "second turn"
 
 
-def test_reset_conversation_clears_history(tmp_path):
+def test_conversation_survives_engine_restart(tmp_path):
+    first_engine = build_engine(tmp_path, provider_name="stub")
+    first_engine.run("remember this")
+    second_engine = build_engine(tmp_path, provider_name="stub")
+    assert second_engine.conversation_history() == first_engine.conversation_history()
+
+
+def test_reset_conversation_clears_history_and_disk(tmp_path):
     engine = build_engine(tmp_path, provider_name="stub")
     engine.run("hello")
     assert engine.conversation_history()
     engine.reset_conversation()
     assert engine.conversation_history() == []
+    reopened = build_engine(tmp_path, provider_name="stub")
+    assert reopened.conversation_history() == []
 
 
 def test_ollama_messages_include_prior_turns():
