@@ -27,7 +27,7 @@ class ExecutionEngine:
         self.state = state
         self.max_steps = max_steps
         self.cancel_event = cancel_event
-        self.history: list[dict] = []
+        self.history: list[dict] = self.state.conversation()[-80:]
 
     def _is_cancelled(self) -> bool:
         return bool(self.cancel_event and self.cancel_event.is_set())
@@ -41,16 +41,21 @@ class ExecutionEngine:
 
     def reset_conversation(self) -> None:
         self.history.clear()
+        self.state.set_conversation([])
         self.state.record_event("conversation_reset", {})
 
     def conversation_history(self) -> list[dict]:
         return list(self.history)
 
+    def _persist_history(self) -> None:
+        self.history = self.history[-80:]
+        self.state.set_conversation(self.history)
+
     def _commit_turn(self, objective: str, turn_items: list[dict], assistant_text: str) -> None:
         self.history.append({"role": "user", "content": objective})
         self.history.extend(turn_items)
         self.history.append({"role": "assistant", "content": assistant_text})
-        self.history = self.history[-80:]
+        self._persist_history()
 
     def run(self, objective: str) -> str:
         self.state.set_objective(objective)
@@ -63,7 +68,6 @@ class ExecutionEngine:
             if self._is_cancelled():
                 return self._cancelled_result(step)
 
-            # The live user message must precede any assistant tool calls/results.
             working_history = self.history + [{"role": "user", "content": objective, "current_turn": True}] + turn_items
             context = self.context_compiler.compile(objective, working_history)
             context["objective_in_history"] = True
