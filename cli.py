@@ -3,172 +3,266 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import shutil
 import sys
 from pathlib import Path
-from urllib import error, request
 
+from prompt_toolkit import PromptSession
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.history import FileHistory
+from prompt_toolkit.styles import Style
+
+from cognigenesis import __version__
+from cognigenesis.bootstrap import aionui_configuration, auto_setup, run_checks
+from cognigenesis.config import config_path, history_path, load_settings, save_settings
+from cognigenesis.console import (
+    RuntimeIdentity,
+    assistant_message,
+    banner,
+    console,
+    error_message,
+    status_table,
+    success_message,
+    warning_message,
+)
 from core.stdio import configure_utf8_stdio
 from harness import build_engine
 from providers.base import ProviderError
 from providers.factory import provider_identity
-from providers.ollama import DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL
 
 
-VERSION = "0.6.0"
+VERSION = __version__
+KNOWN_COMMANDS = {"run", "chat", "setup", "doctor", "aionui", "config"}
 
 
-def _build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="cogni", description="Cognigenesis Harness CLI")
-    parser.add_argument("objective", nargs="?", help="Objective, 'chat', or 'doctor'")
-    parser.add_argument("--workspace", default="workspace", help="Sandbox workspace directory")
+def _provider_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--workspace", default=None, help="Workspace directory (default: current directory/config)")
     parser.add_argument("--provider", default=None, choices=["ollama", "stub"])
-    parser.add_argument("--model", default=None)
-    parser.add_argument("--base-url", default=None)
-    parser.add_argument("--timeout", default=None, type=float)
+    parser.add_argument("--model", default=None, help="Ollama model name")
+    parser.add_argument("--base-url", default=None, help="Ollama base URL")
+    parser.add_argument("--timeout", default=None, type=float, help="Provider timeout in seconds")
+
+
+def _normalize_argv(argv: list[str]) -> list[str]:
+    if not argv:
+        return ["chat"] if sys.stdin.isatty() else []
+    if argv[0] in {"-h", "--help", "--version"} or argv[0] in KNOWN_COMMANDS:
+        return argv
+    # Backward-compatible: cogni "prompt" and cogni --model x "prompt".
+    return ["run", *argv]
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="cogni", description="Cognigenesis Harness — local-first adaptive intelligence runtime")
     parser.add_argument("--version", action="version", version=f"cognigenesis-harness {VERSION}")
+    sub = parser.add_subparsers(dest="command")
+
+    run = sub.add_parser("run", help="Run one objective and exit")
+    _provider_args(run)
+    run.add_argument("objective", nargs="+", help="Objective to execute")
+
+    chat = sub.add_parser("chat", help="Start the persistent themed chat interface")
+    _provider_args(chat)
+
+    setup = sub.add_parser("setup", help="Configure Cognigenesis and auto-detect Ollama")
+    setup.add_argument("--model", default=None)
+    setup.add_argument("--base-url", default=None)
+    setup.add_argument("--timeout", type=float, default=None)
+
+    doctor = sub.add_parser("doctor", help="Diagnose installation, Ollama, model, PATH, and AionUi")
+    doctor.add_argument("--json", action="store_true", dest="as_json")
+
+    aionui = sub.add_parser("aionui", help="Show first-class AionUi custom-agent configuration")
+    aionui.add_argument("--json", action="store_true", dest="as_json")
+
+    config = sub.add_parser("config", help="Show the resolved persistent configuration")
+    config.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
+def _resolved_workspace(raw: str | None) -> Path:
+    settings = load_settings()
+    value = raw or settings.default_workspace or "."
+    path = Path(value).expanduser().resolve()
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
 def _make_engine(args: argparse.Namespace):
-    workspace = Path(args.workspace).resolve()
-    workspace.mkdir(parents=True, exist_ok=True)
+    workspace = _resolved_workspace(getattr(args, "workspace", None))
     return build_engine(
         workspace,
-        provider_name=args.provider,
-        model=args.model,
-        base_url=args.base_url,
-        timeout=args.timeout,
+        provider_name=getattr(args, "provider", None),
+        model=getattr(args, "model", None),
+        base_url=getattr(args, "base_url", None),
+        timeout=getattr(args, "timeout", None),
     ), workspace
 
 
-def _print_chat_help() -> None:
-    print(
-        "Commands:\n"
-        "  /help          Show this help\n"
-        "  /new           Clear conversational context\n"
-        "  /state         Show current runtime state\n"
-        "  /capabilities  List registered capabilities\n"
-        "  /provider      Show active provider/model\n"
-        "  /workspace     Show active workspace\n"
-        "  /exit          Leave chat\n"
+def _chat_help() -> None:
+    console.print(
+        "[cogni.muted]Commands[/]\n"
+        "  [cogni.cyan]/help[/]          Show commands\n"
+        "  [cogni.cyan]/new[/]           Clear conversational context\n"
+        "  [cogni.cyan]/state[/]         Show current runtime state\n"
+        "  [cogni.cyan]/capabilities[/]  List executable capabilities\n"
+        "  [cogni.cyan]/provider[/]      Show active provider/model\n"
+        "  [cogni.cyan]/workspace[/]     Show active workspace\n"
+        "  [cogni.cyan]/doctor[/]        Run health diagnostics\n"
+        "  [cogni.cyan]/exit[/]          Leave chat\n"
+    )
+
+
+def _prompt_session() -> PromptSession:
+    style = Style.from_dict({"prompt": "#62F5FF bold", "continuation": "#8B7CFF"})
+    return PromptSession(
+        history=FileHistory(str(history_path())),
+        auto_suggest=AutoSuggestFromHistory(),
+        style=style,
+        multiline=False,
     )
 
 
 def _run_chat(args: argparse.Namespace) -> int:
     engine, workspace = _make_engine(args)
     provider_name, model_name = provider_identity(engine.provider)
-
-    print(f"Cognigenesis Harness {VERSION}")
-    print(f"Provider:  {provider_name}")
-    print(f"Model:     {model_name}")
-    print(f"Workspace: {workspace}")
-    print("Type /help for commands.\n")
+    banner(VERSION, RuntimeIdentity(provider_name, model_name, str(workspace)))
+    console.print("[cogni.muted]Type /help for commands. Ctrl+C cancels input; Ctrl+D exits.[/]\n")
+    session = _prompt_session()
 
     while True:
         try:
-            prompt = input("You > ").strip()
-        except (EOFError, KeyboardInterrupt):
-            print("\nExiting Cognigenesis chat.")
+            prompt = session.prompt([("class:prompt", "You › ")]).strip()
+        except EOFError:
+            console.print("[cogni.muted]Session closed.[/]")
             return 0
+        except KeyboardInterrupt:
+            console.print("[cogni.muted]Input cancelled.[/]")
+            continue
 
         if not prompt:
             continue
         if prompt in {"/exit", "/quit"}:
             return 0
         if prompt == "/help":
-            _print_chat_help()
-            continue
+            _chat_help(); continue
         if prompt == "/new":
-            engine.reset_conversation()
-            print("Conversation context cleared.\n")
-            continue
+            engine.reset_conversation(); success_message("Conversation context cleared."); continue
         if prompt == "/state":
-            print(json.dumps(engine.state.snapshot(), indent=2, ensure_ascii=False))
-            print()
-            continue
+            console.print_json(json.dumps(engine.state.snapshot(), ensure_ascii=False)); continue
         if prompt == "/capabilities":
             for capability in engine.registry.describe():
-                print(f"- {capability['id']}: {capability['description']}")
-            print()
+                console.print(f"[cogni.violet]•[/] [bold]{capability['id']}[/] [cogni.muted]{capability['description']}[/]")
             continue
         if prompt == "/provider":
-            provider_name, model_name = provider_identity(engine.provider)
-            print(f"{provider_name} / {model_name}\n")
-            continue
+            p, m = provider_identity(engine.provider); status_table([("provider", p, "cogni.green"), ("model", m, "")]); continue
         if prompt == "/workspace":
-            print(f"{workspace}\n")
-            continue
+            console.print(str(workspace)); continue
+        if prompt == "/doctor":
+            _render_checks(run_checks()); continue
         if prompt.startswith("/"):
-            print(f"Unknown command: {prompt}. Type /help.\n")
-            continue
+            warning_message(f"Unknown command: {prompt}. Type /help."); continue
 
         try:
-            result = engine.run(prompt)
+            with console.status("[cogni.violet]Cognigenesis is working…[/]", spinner="dots"):
+                result = engine.run(prompt)
+            assistant_message(result)
         except ProviderError as exc:
-            print(f"Cogni > Provider error: {exc}\n")
-            continue
+            error_message(str(exc))
         except Exception as exc:
-            print(f"Cogni > Runtime error: {exc}\n")
-            continue
-
-        print(f"Cogni > {result}\n")
+            error_message(f"Runtime error: {exc}")
 
 
-def _run_doctor(args: argparse.Namespace) -> int:
-    base_url = (args.base_url or os.getenv("COGNI_OLLAMA_BASE_URL") or DEFAULT_OLLAMA_BASE_URL).rstrip("/")
-    model = args.model or os.getenv("COGNI_OLLAMA_MODEL") or DEFAULT_OLLAMA_MODEL
-    print(f"Cognigenesis Harness {VERSION} diagnostics")
-    print(f"Python:       {sys.executable}")
-    print(f"Python ver:   {sys.version.split()[0]}")
-    print(f"stdout:       {getattr(sys.stdout, 'encoding', None)}")
-    print(f"cogni:        {shutil.which('cogni') or 'NOT FOUND'}")
-    print(f"cogni-acp:    {shutil.which('cogni-acp') or 'NOT FOUND'}")
-    print(f"Ollama URL:   {base_url}")
-    print(f"Ollama model: {model}")
+def _render_checks(checks) -> int:
+    rows = []
+    failures = 0
+    for check in checks:
+        if check.ok:
+            rows.append((check.name, check.detail, "cogni.green"))
+        else:
+            failures += 1
+            rows.append((check.name, check.detail, "cogni.red"))
+    status_table(rows)
+    for check in checks:
+        if not check.ok and check.fix:
+            console.print(f"[cogni.amber]Fix {check.name}:[/] {check.fix}")
+    return 0 if failures == 0 else 1
 
-    try:
-        req = request.Request(f"{base_url}/api/tags", headers={"User-Agent": "Cognigenesis-Harness/doctor"})
-        with request.urlopen(req, timeout=5) as response:
-            data = json.loads(response.read().decode("utf-8"))
-        names = [item.get("name") for item in data.get("models", []) if item.get("name")]
-        print("Ollama:       reachable")
-        print(f"Model status: {'installed' if model in names else 'MISSING'}")
-        if model not in names:
-            print(f"Fix:          ollama pull {model}")
-    except (error.URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
-        print(f"Ollama:       NOT REACHABLE ({exc})")
-        print("Fix:          start Ollama, then run: ollama list")
 
-    appdata = os.getenv("APPDATA")
-    if appdata:
-        legacy = Path(appdata) / "AionUi" / "cognigenesis" / "cognigenesis_ollama.py"
-        if legacy.exists():
-            print(f"\nWARNING: legacy AionUi bridge detected:\n  {legacy}")
-            print("Your AionUi conversation may still be bypassing the packaged cogni-acp agent.")
-            print("Fix AionUi Custom Agent command to the installed cogni-acp executable and leave arguments empty.")
+def _run_setup(args: argparse.Namespace) -> int:
+    banner(VERSION)
+    settings, checks = auto_setup(model=args.model, base_url=args.base_url, timeout=args.timeout)
+    console.print(f"[cogni.muted]Config:[/] {config_path()}")
+    console.print(f"[cogni.muted]Provider:[/] {settings.provider}")
+    console.print(f"[cogni.muted]Model:[/] {settings.model}")
+    code = _render_checks(checks)
+    if code == 0:
+        success_message("Cognigenesis is ready. Run: cogni chat")
+    return code
+
+
+def _run_doctor(as_json: bool) -> int:
+    checks = run_checks()
+    if as_json:
+        print(json.dumps([check.__dict__ for check in checks], indent=2, ensure_ascii=False))
+        return 0 if all(check.ok for check in checks) else 1
+    banner(VERSION)
+    return _render_checks(checks)
+
+
+def _run_aionui(as_json: bool) -> int:
+    cfg = aionui_configuration()
+    if as_json:
+        print(json.dumps(cfg, indent=2, ensure_ascii=False)); return 0
+    banner(VERSION)
+    status_table([
+        ("Display name", cfg["display_name"], "cogni.cyan"),
+        ("Command", cfg["command"], "cogni.green"),
+        ("Arguments", "<empty>", ""),
+    ])
+    console.print("[cogni.muted]Environment[/]")
+    for key, value in cfg["environment"].items():
+        console.print(f"  [cogni.violet]{key}[/]={value}")
     return 0
 
 
 def main() -> None:
     configure_utf8_stdio()
-    parser = _build_parser()
-    args = parser.parse_args()
+    argv = _normalize_argv(sys.argv[1:])
+    parser = _parser()
+    if not argv:
+        parser.print_help(); return
+    args = parser.parse_args(argv)
 
-    if args.objective == "chat":
+    if args.command == "chat":
         raise SystemExit(_run_chat(args))
-    if args.objective == "doctor":
-        raise SystemExit(_run_doctor(args))
-
-    if not args.objective:
-        parser.print_help()
+    if args.command == "setup":
+        raise SystemExit(_run_setup(args))
+    if args.command == "doctor":
+        raise SystemExit(_run_doctor(args.as_json))
+    if args.command == "aionui":
+        raise SystemExit(_run_aionui(args.as_json))
+    if args.command == "config":
+        settings = load_settings()
+        if args.as_json:
+            print(json.dumps(settings.__dict__, indent=2, ensure_ascii=False))
+        else:
+            banner(VERSION); status_table([(k, str(v), "") for k, v in settings.__dict__.items()])
+        return
+    if args.command == "run":
+        engine, _workspace = _make_engine(args)
+        objective = " ".join(args.objective)
+        try:
+            result = engine.run(objective)
+            if sys.stdout.isatty() and not os.getenv("NO_COLOR"):
+                assistant_message(result)
+            else:
+                print(result)
+        except ProviderError as exc:
+            error_message(str(exc))
+            raise SystemExit(2) from exc
         return
 
-    engine, _workspace = _make_engine(args)
-    try:
-        print(engine.run(args.objective))
-    except ProviderError as exc:
-        raise SystemExit(f"Provider error: {exc}") from exc
+    parser.print_help()
 
 
 if __name__ == "__main__":
