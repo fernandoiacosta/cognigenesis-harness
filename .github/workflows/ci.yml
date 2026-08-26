@@ -22,17 +22,42 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install package
+      - name: Install development dependencies
         run: python -m pip install -e ".[dev]"
 
-      - name: Run tests
+      - name: Run full test suite
         run: python -m pytest -q
+
+      - name: Build distributable wheel and sdist
+        run: python -m build
+
+      - name: Install built wheel
+        run: python -c "import glob,subprocess,sys; w=glob.glob('dist/*.whl')[0]; subprocess.check_call([sys.executable,'-m','pip','install','--force-reinstall',w])"
+
+      - name: Verify packaged control-plane resources outside repo
+        run: python -c "import os,tempfile; os.chdir(tempfile.mkdtemp()); from cognigenesis.resources import text; assert 'Completion Principle' in text('agent.md'); assert 'Prime Dark' in text('theme.json')"
 
       - name: Verify human CLI
         run: cogni --version
 
+      - name: Verify noninteractive configuration command
+        run: cogni config --json
+
+      - name: Verify AionUi configuration command
+        run: cogni aionui --json
+
       - name: Verify ACP package import
         run: python -c "import acp; import acp_bridge; print(acp_bridge.CognigenesisAcpAgent.__name__)"
 
-      - name: Verify ACP executable is installed
-        run: python -c "import shutil; assert shutil.which('cogni-acp'), 'cogni-acp not found on PATH'"
+      - name: Verify both executables are installed
+        run: python -c "import shutil; assert shutil.which('cogni'); assert shutil.which('cogni-acp')"
+
+      - name: Validate POSIX installer syntax
+        if: runner.os != 'Windows'
+        run: sh -n scripts/install.sh
+
+      - name: Validate PowerShell installer syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $null = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path scripts/install.ps1), [ref]$null, [ref]$null)
