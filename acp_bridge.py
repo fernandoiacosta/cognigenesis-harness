@@ -32,7 +32,7 @@ from acp.schema import (
 
 from core.engine import ExecutionEngine
 from harness import build_engine
-
+from providers.base import ProviderError
 
 ACP_SOURCE = "Cognigenesis"
 
@@ -46,7 +46,6 @@ class AcpSession:
 
 
 def extract_text(blocks: list[Any]) -> str:
-    """Extract user text from ACP content blocks without assuming one SDK representation."""
     parts: list[str] = []
     for block in blocks:
         if isinstance(block, dict):
@@ -55,15 +54,13 @@ def extract_text(blocks: list[Any]) -> str:
         else:
             block_type = getattr(block, "type", None)
             text = getattr(block, "text", None)
-
         if block_type == "text" and isinstance(text, str):
             parts.append(text)
-
     return "\n".join(part for part in parts if part).strip()
 
 
 class CognigenesisAcpAgent(Agent):
-    """ACP-over-stdio adapter around the existing Cognigenesis execution kernel."""
+    """Python-native ACP-over-stdio adapter. No Node/.cmd subprocess hop is used."""
 
     _conn: Client
 
@@ -73,74 +70,39 @@ class CognigenesisAcpAgent(Agent):
     def on_connect(self, conn: Client) -> None:
         self._conn = conn
 
-    async def initialize(
-        self,
-        protocol_version: int,
-        client_capabilities: ClientCapabilities | None = None,
-        client_info: Implementation | None = None,
-        **kwargs: Any,
-    ) -> InitializeResponse:
-        # Echo the negotiated version as recommended by the current ACP Python SDK.
+    async def initialize(self, protocol_version: int, client_capabilities: ClientCapabilities | None = None, client_info: Implementation | None = None, **kwargs: Any) -> InitializeResponse:
         return InitializeResponse(protocol_version=protocol_version)
 
-    async def new_session(
-        self,
-        cwd: str,
-        additional_directories: list[str] | None = None,
-        mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None,
-        **kwargs: Any,
-    ) -> NewSessionResponse:
+    async def new_session(self, cwd: str, additional_directories: list[str] | None = None, mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None, **kwargs: Any) -> NewSessionResponse:
         workspace = Path(cwd).expanduser().resolve()
         if not workspace.is_dir():
             raise ValueError(f"ACP session cwd is not a directory: {workspace}")
-
-        # Additional directories and client-provided MCP servers are deliberately not
-        # granted automatically. Cognigenesis keeps its own capability/policy boundary.
         _ = additional_directories, mcp_servers
-
         session_id = uuid4().hex
         cancel_event = Event()
         state_path = workspace / ".cognigenesis" / "sessions" / f"{session_id}.json"
-        engine = build_engine(
-            workspace,
-            cancel_event=cancel_event,
-            state_path=state_path,
-        )
-        self._sessions[session_id] = AcpSession(
-            workspace=workspace,
-            engine=engine,
-            cancel_event=cancel_event,
-            prompt_lock=asyncio.Lock(),
-        )
+        engine = build_engine(workspace, cancel_event=cancel_event, state_path=state_path)
+        self._sessions[session_id] = AcpSession(workspace, engine, cancel_event, asyncio.Lock())
         return NewSessionResponse(session_id=session_id)
 
-    async def prompt(
-        self,
-        session_id: str,
-        prompt: list[
-            TextContentBlock
-            | ImageContentBlock
-            | AudioContentBlock
-            | ResourceContentBlock
-            | EmbeddedResourceContentBlock
-        ],
-        **kwargs: Any,
-    ) -> PromptResponse:
+    async def prompt(self, session_id: str, prompt: list[TextContentBlock | ImageContentBlock | AudioContentBlock | ResourceContentBlock | EmbeddedResourceContentBlock], **kwargs: Any) -> PromptResponse:
         session = self._sessions.get(session_id)
         if session is None:
             raise ValueError(f"Unknown ACP session: {session_id}")
-
         objective = extract_text(prompt)
         if not objective:
-            await self._send_text(
-                session_id,
-                "Cognigenesis currently accepts text prompts over ACP.",
-            )
+            await self._send_text(session_id, "Cognigenesis currently accepts text prompts over ACP.")
             return PromptResponse(stop_reason="end_turn")
 
         async with session.prompt_lock:
             session.cancel_event.clear()
-            result = await asyncio.to_thread(session.engine.run, objective)
+            try:
+                result = await asyncio.to_thread(session.engine.run, objective)
+            except ProviderError as exc:
+                # Send a classified, actionable provider message instead of leaking an
+                # opaque ACP internal error that AionUi reports as UNKNOWN_UPSTREAM_ERROR.
+                await self._send_text(session_id, f"Provider error: {exc}")
+                return PromptResponse(stop_reason="end_turn")
             cancelled = session.cancel_event.is_set()
             await self._send_text(session_id, result)
             return PromptResponse(stop_reason="cancelled" if cancelled else "end_turn")
@@ -151,16 +113,10 @@ class CognigenesisAcpAgent(Agent):
             session.cancel_event.set()
 
     async def _send_text(self, session_id: str, text: str) -> None:
-        update = update_agent_message(text_block(text))
-        await self._conn.session_update(
-            session_id=session_id,
-            update=update,
-            source=ACP_SOURCE,
-        )
+        await self._conn.session_update(session_id=session_id, update=update_agent_message(text_block(text)), source=ACP_SOURCE)
 
 
 async def _main() -> None:
-    # ACP owns stdout. Do not print logs or banners from this entry point.
     await run_agent(CognigenesisAcpAgent())
 
 
