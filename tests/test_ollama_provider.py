@@ -1,5 +1,6 @@
 import io
 import json
+import socket
 from urllib import error
 
 import pytest
@@ -53,6 +54,15 @@ def test_ollama_provider_reports_unreachable(monkeypatch):
     monkeypatch.setattr("providers.ollama.request.urlopen", fail)
     with pytest.raises(ProviderError, match="Ollama is not reachable at http://127.0.0.1:11434"):
         OllamaProvider().generate(context())
+
+
+def test_ollama_provider_reports_timeout_separately(monkeypatch):
+    def fail(*args, **kwargs):
+        raise socket.timeout("timed out")
+
+    monkeypatch.setattr("providers.ollama.request.urlopen", fail)
+    with pytest.raises(ProviderError, match=r"Ollama timed out after 42s.*slow-model"):
+        OllamaProvider(model="slow-model", timeout=42).generate(context())
 
 
 def test_ollama_provider_reports_missing_model(monkeypatch):
