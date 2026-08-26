@@ -4,84 +4,81 @@ A minimal, extensible agent runtime built around one central principle:
 
 > Keep the execution kernel extremely small. Move cognition, procedures, and growth outward into composable capabilities and Markdown control documents.
 
-The project evolved from the idea of a large integrated agent into a **minimal runtime that can safely grow an agent**.
-
-## Five planes
-
-1. **Cognitive Control Plane** — Markdown describing behavior, modes, procedures, skills, and memory.
-2. **Execution Kernel** — A tiny recursive model/tool/observation loop.
-3. **Capability Plane** — Trusted executable implementations.
-4. **State Plane** — Goals, events, checkpoints, artifacts, and continuity.
-5. **Evolution Plane** — Capability-gap detection, skill synthesis, bounded plugin synthesis, validation, promotion, and rollback.
-
-## Model alignment and authority
-
-Cognigenesis does **not** assume that connecting a model makes it trustworthy.
-
-Models receive a `ModelProfile` measuring reasoning, instruction fidelity, tool reliability, uncertainty calibration, goal persistence, capability-hallucination resistance, recovery behavior, and protocol compatibility.
-
-Capabilities are trust-gated:
+## Runtime architecture
 
 ```text
-model
+objective
   ↓
-qualification
+Markdown control plane
   ↓
-model profile
+context compiler
   ↓
-trust tier
+selected model provider
   ↓
-policy + capability minimum tier
+execution kernel
   ↓
-execute or deny
+policy + model trust gate
+  ↓
+capability registry
+  ↓
+observation / repeat
 ```
 
-Unknown models start restricted. A capable harness must not automatically amplify an unreliable model.
+## v0.4.0: real Ollama execution
 
-See [`ALIGNMENT.md`](ALIGNMENT.md).
+Normal execution is now **Ollama-backed by default**. `StubProvider` remains available only when explicitly selected for tests/demo mode.
 
-## Install
+Default Ollama settings:
 
-Requires Python 3.11–3.14.
-
-### Private-repository one-liner — macOS/Linux
-
-Requires GitHub CLI authenticated to an account with repository access:
-
-```bash
-gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.sh -H "Accept: application/vnd.github.raw+json" | sh
+```text
+COGNI_PROVIDER=ollama
+COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+COGNI_OLLAMA_MODEL=llama3.1:8b
+COGNI_OLLAMA_TIMEOUT=120
 ```
 
-### Private-repository one-liner — Windows PowerShell
+Any installed Ollama model can be selected, including custom models such as `hasi-edge-AG:latest`.
+
+## Install / upgrade
+
+Requires Python 3.11–3.14 and authenticated access to this private repository.
 
 ```powershell
-$script = gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.ps1 -H "Accept: application/vnd.github.raw+json"; Invoke-Expression ($script -join "`n")
+python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
 ```
 
-Or install directly with authenticated Git credentials:
+Verify:
 
-```bash
-uv tool install git+https://github.com/fernandoiacosta/cognigenesis-harness.git
+```powershell
+cogni --version
+where.exe cogni-acp
+ollama list
 ```
 
-After installation:
+## Terminal usage
 
-```bash
-cogni --help
-cogni "Inspect this workspace and summarize its architecture."
+```powershell
+cogni --provider ollama --model llama3.1:8b "Say OK"
 ```
 
-See [`INSTALL.md`](INSTALL.md) for alternatives and the future public installer path.
+Or configure once for the current shell:
 
-## AionUi first-class custom agent
+```powershell
+$env:COGNI_OLLAMA_MODEL = "hasi-edge-AG:latest"
+cogni "Say OK"
+```
 
-The regular `cogni` executable is a human-facing CLI. AionUi Custom Agents require ACP over stdio, so Cognigenesis now ships a separate ACP entry point:
+If Ollama is unavailable, Cognigenesis returns an actionable provider error. If the model is missing, it names the model and suggests `ollama pull <model>`.
+
+## AionUi custom ACP agent
+
+Cognigenesis ships a Python-native ACP-over-stdio entry point:
 
 ```text
 cogni-acp
 ```
 
-In AionUi, add a custom agent under **Settings → Agent Management → Custom Agents** with:
+Configure AionUi:
 
 ```text
 Display name: Cognigenesis
@@ -89,38 +86,31 @@ Command:      cogni-acp
 Arguments:    <empty>
 ```
 
-AionUi launches `cogni-acp` as a subprocess and communicates with it using Agent Client Protocol messages over stdin/stdout.
+Recommended AionUi environment variables:
 
-The ACP bridge:
+```text
+COGNI_PROVIDER=ollama
+COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+COGNI_OLLAMA_MODEL=hasi-edge-AG:latest
+COGNI_OLLAMA_TIMEOUT=120
+```
 
-- negotiates ACP initialization
-- creates isolated Cognigenesis sessions per AionUi conversation
-- uses the AionUi-selected project directory as the Cognigenesis workspace
-- translates ACP prompts into Cognigenesis objectives
-- streams the resulting agent message back through ACP session updates
-- supports cooperative ACP cancellation
-- preserves Cognigenesis policy and model-trust gates
-- does not automatically grant client-provided additional directories or MCP servers
+The ACP bridge is Python-native and does not launch Node `.cmd` wrappers during `session/prompt`, avoiding the Windows `spawn EINVAL` workaround that was previously required.
 
-See [`AIONUI.md`](AIONUI.md) for setup and architecture details.
+See [`AIONUI.md`](AIONUI.md).
 
-## Current status
+## Model alignment and authority
 
-Version `0.3.0` adds:
+Connecting a model does not automatically grant it authority. Models receive conservative trust profiles until qualified, and capabilities require both runtime-policy approval and a sufficient trust tier.
 
-- first-class ACP-over-stdio bridge
-- `cogni-acp` executable for AionUi and other ACP clients
-- isolated ACP session state
-- cooperative execution cancellation
-- ACP bridge tests
-- installable `cogni` CLI
-- macOS/Linux installer
-- Windows PowerShell installer
-- model qualification profiles
-- trust tiers
-- per-capability minimum trust levels
-- runtime policy + model-trust dual gating
-- conservative default for unknown models
-- single authoritative policy source
+See [`ALIGNMENT.md`](ALIGNMENT.md) and [`SECURITY.md`](SECURITY.md).
 
-The default provider remains a deterministic stub. Real OpenAI, Anthropic, and Ollama adapters are deliberately outside the kernel and should be connected only with provider-specific qualification evidence.
+## Tests
+
+CI runs on Ubuntu, macOS, and Windows across supported Python versions. It includes:
+
+- mocked Ollama HTTP response tests
+- explicit provider-selection tests
+- ACP subprocess handshake/prompt smoke tests
+- Windows-safe Python argument-array launch path
+- optional live Ollama ACP round trip with `COGNI_TEST_OLLAMA=1`
