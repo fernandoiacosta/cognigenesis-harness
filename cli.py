@@ -10,7 +10,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(prog="cogni", description="Cognigenesis Harness CLI")
     parser.add_argument("objective", nargs="?", help="Objective for the harness")
     parser.add_argument("--workspace", default="workspace", help="Sandbox workspace directory")
-    parser.add_argument("--version", action="version", version="cognigenesis-harness 0.2.0")
+    parser.add_argument("--version", action="version", version="cognigenesis-harness 0.3.0")
     args = parser.parse_args()
 
     if not args.objective:
