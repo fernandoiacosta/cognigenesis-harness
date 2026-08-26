@@ -1,60 +1,68 @@
 # Model Qualification and Capability Alignment
 
-Cognigenesis Harness must not assume that connecting a model makes that model trustworthy.
-
-The harness separates **capability** from **authority**.
-
-## Principle
+Cognigenesis Harness separates **capability** from **authority**.
 
 > Capability should scale with demonstrated alignment and competence, not merely model availability.
 
-A more capable harness can amplify both strengths and failure modes. Therefore every model should begin restricted and earn broader capability access through qualification evidence.
+## Trust tiers
 
-## Qualification Dimensions
+### Observer
 
-Profiles measure:
+Unqualified/default state. Read-only public research is available; workspace mutation is not.
 
-- reasoning quality
+### Basic
+
+Low-risk workspace inspection may be considered.
+
+### Trusted
+
+Normal trust-gated workspace operations may execute when runtime policy also permits them.
+
+### Extended
+
+Reserved for stronger external evidence. The built-in v1 qualification suite **cannot** grant this tier.
+
+## Built-in v1 qualification
+
+Run:
+
+```text
+cogni qualify
+```
+
+or simply:
+
+```text
+cogni setup
+```
+
+when a local Ollama model is available. Setup automatically qualifies models that do not already have a successful saved profile.
+
+The bounded suite checks:
+
 - instruction fidelity
-- tool-use reliability
-- uncertainty calibration
-- goal persistence
-- resistance to hallucinating unavailable capabilities
-- recovery behavior after failures
-- protocol compatibility
+- capability-boundary discipline
+- uncertainty behavior
+- tool-failure discipline
 
-## Trust Tiers
+The resulting `ModelProfile` also carries conservative estimates for reasoning, goal persistence, recovery, and protocol compatibility. Evidence and profile metadata are persisted in the Cognigenesis user-data directory.
 
-### Tier 0 — Observer
+A successful built-in suite can promote a model to **Trusted**, enabling normal mutation capabilities that already pass runtime policy. It cannot grant Extended authority.
 
-No mutation authority. Suitable for unqualified or unreliable models.
+Failed or low-trust profiles remain restricted and are automatically reevaluated by `cogni setup`; `cogni qualify --force` explicitly reruns the suite.
 
-### Tier 1 — Basic
+## Dual-gate rule
 
-Low-risk workspace inspection and constrained operations.
+A capability executes only when both conditions are true:
 
-### Tier 2 — Trusted
-
-Broader workspace actions after demonstrated reliability.
-
-### Tier 3 — Extended
-
-Higher-risk capabilities may be considered, still subject to explicit runtime policy.
-
-Trust tiers do not bypass policy. They add an additional gate.
-
-## Rule
-
-A capability is executable only when both conditions are true:
-
-1. Runtime policy grants it.
-2. The active model profile meets its minimum trust tier.
+1. runtime policy grants it
+2. the active persisted model profile meets its minimum trust tier
 
 ```text
 MODEL
   │
   ▼
-QUALIFICATION
+QUALIFICATION EVIDENCE
   │
   ▼
 MODEL PROFILE
@@ -62,17 +70,21 @@ MODEL PROFILE
   ▼
 TRUST TIER
   │
-  ├─────────────┐
-  ▼             ▼
-POLICY       CAPABILITY
-  │             │
-  └──────┬──────┘
-         ▼
-      EXECUTE
+  ├───────────────┐
+  ▼               ▼
+RUNTIME POLICY  CAPABILITY MINIMUM
+  │               │
+  └───────┬───────┘
+          ▼
+        EXECUTE
 ```
 
-## Conservative Default
+## Conservative default
 
-Unknown models do not inherit trust from Cognigenesis. New providers begin with a conservative bootstrap profile until measured by an evaluation suite.
+Unknown model identifiers do not inherit trust from Cognigenesis. A changed model name/version with no matching saved profile starts from the conservative profile.
 
-A high average score cannot hide a severe weakness in instruction fidelity, tool reliability, or capability-hallucination resistance. Critical-dimension floors cap the resulting trust tier.
+A high average score cannot hide severe weaknesses in instruction fidelity, tool reliability, or capability-hallucination resistance; critical-dimension floors cap the tier.
+
+## What qualification does not prove
+
+The built-in suite is a practical runtime risk control, not proof of general intelligence, universal safety, or correctness. Higher-risk future capabilities should require deeper provider/model-version-specific evaluation and adversarial evidence before any Extended promotion mechanism is introduced.
