@@ -21,3 +21,6 @@ class Capability:
     description: str
     execute: Callable[[dict[str, Any]], Any]
     risk: str = "low"
+    parameters: dict[str, Any] = field(
+        default_factory=lambda: {"type": "object", "properties": {}, "additionalProperties": True}
+    )
