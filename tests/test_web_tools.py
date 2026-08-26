@@ -1,7 +1,9 @@
+import pytest
+
 from core.policy import Policy
 from core.qualification import conservative_profile
 from core.registry import CapabilityRegistry
-from tools.web import _DuckDuckGoParser, _strip_html, register_web_tools
+from tools.web import _DuckDuckGoParser, _assert_public_url, _strip_html, register_web_tools
 
 
 def test_duckduckgo_parser_extracts_title_url_and_snippet():
@@ -29,3 +31,25 @@ def test_web_tools_are_registered_and_observer_authorized(tmp_path):
     policy = Policy(tmp_path, model_profile=profile)
     assert policy.authorize("web.search", {"query": "test"})[0]
     assert policy.authorize("web.fetch", {"url": "https://example.com"})[0]
+
+
+def test_web_fetch_rejects_localhost_without_dns():
+    with pytest.raises(PermissionError, match="localhost"):
+        _assert_public_url("http://localhost:8080/private")
+
+
+def test_web_fetch_rejects_private_ip(monkeypatch):
+    monkeypatch.setattr(
+        "tools.web.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("192.168.1.20", 443))],
+    )
+    with pytest.raises(PermissionError, match="non-public"):
+        _assert_public_url("https://example.test/private")
+
+
+def test_web_fetch_allows_global_ip(monkeypatch):
+    monkeypatch.setattr(
+        "tools.web.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, None, ("93.184.216.34", 443))],
+    )
+    _assert_public_url("https://example.com")
