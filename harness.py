@@ -16,13 +16,17 @@ from tools.shell import register_shell_tools
 from tools.workspace import register_workspace_tools
 
 
-def build_engine(workspace: Path, cancel_event: Event | None = None) -> ExecutionEngine:
+def build_engine(
+    workspace: Path,
+    cancel_event: Event | None = None,
+    state_path: Path | None = None,
+) -> ExecutionEngine:
     registry = CapabilityRegistry()
     register_filesystem_tools(registry, workspace)
     register_shell_tools(registry, workspace)
     register_workspace_tools(registry, workspace)
 
-    state = StateStore(workspace / ".cognigenesis" / "state.json")
+    state = StateStore(state_path or workspace / ".cognigenesis" / "state.json")
     provider = StubProvider()
 
     # Models begin conservatively restricted. Provider-specific qualification
