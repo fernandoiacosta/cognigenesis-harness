@@ -1,0 +1,35 @@
+:root {
+  --cogni-bg: #05070D;
+  --cogni-surface: #0B1020;
+  --cogni-surface-elevated: #11182B;
+  --cogni-border: #1B2440;
+  --cogni-text: #F3F7FF;
+  --cogni-text-secondary: #A7B0C3;
+  --cogni-muted: #6F7B92;
+  --cogni-cyan: #62F5FF;
+  --cogni-violet: #8B7CFF;
+  --cogni-magenta: #C96CFF;
+  --cogni-success: #54E6A8;
+  --cogni-warning: #FFC857;
+  --cogni-danger: #FF6B7A;
+  --cogni-radius: 18px;
+  --cogni-glow: 0 0 30px rgba(98, 245, 255, 0.18);
+}
+
+.cogni-surface {
+  background: rgba(11, 16, 32, 0.88);
+  border: 1px solid var(--cogni-border);
+  border-radius: var(--cogni-radius);
+  color: var(--cogni-text);
+  box-shadow: var(--cogni-glow);
+  backdrop-filter: blur(18px);
+}
+
+.cogni-accent {
+  background: linear-gradient(135deg, var(--cogni-cyan), var(--cogni-violet), var(--cogni-magenta));
+}
+
+.cogni-focus:focus-visible {
+  outline: 2px solid var(--cogni-cyan);
+  outline-offset: 2px;
+}
