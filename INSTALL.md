@@ -1,6 +1,6 @@
 # Installation
 
-Cognigenesis Harness supports macOS, Linux, and Windows.
+Cognigenesis Harness supports macOS, Linux, and Windows with Python 3.11–3.14.
 
 Because the repository is currently private, installation requires authenticated access to GitHub. Anonymous raw-file installers will only work after the project or installer is published.
 
@@ -18,12 +18,37 @@ or:
 pipx install git+https://github.com/fernandoiacosta/cognigenesis-harness.git
 ```
 
+The package installs two executables:
+
+```text
+cogni      Human-facing Cognigenesis CLI
+cogni-acp  ACP-over-stdio agent entry point for AionUi and other ACP clients
+```
+
 After installation:
 
 ```bash
 cogni --help
 cogni "Create a Python CLI project for tracking expenses"
 ```
+
+To verify the AionUi/ACP entry point is available:
+
+macOS/Linux:
+
+```bash
+which cogni-acp
+```
+
+Windows:
+
+```powershell
+where.exe cogni-acp
+```
+
+Do not expect `cogni-acp` to behave like an interactive terminal program. It waits for ACP JSON-RPC messages on stdin and writes protocol messages to stdout.
+
+See [`AIONUI.md`](AIONUI.md) for AionUi Custom Agent configuration.
 
 ## Authenticated one-liner — macOS/Linux
 
