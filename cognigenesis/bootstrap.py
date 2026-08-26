@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from cognigenesis.config import Settings, data_dir, load_settings, save_settings
+from cognigenesis.profiles import load_profile
 from cognigenesis.resources import text as resource_text
 from providers.ollama import choose_model, list_models
 
@@ -31,10 +32,7 @@ def detect_legacy_aionui_bridge() -> Path | None:
 def install_brand_assets() -> dict[str, Path]:
     brand_dir = data_dir() / "brand"
     brand_dir.mkdir(parents=True, exist_ok=True)
-    outputs = {
-        "logo": brand_dir / "cognigenesis-logo.svg",
-        "theme": brand_dir / "theme.json",
-    }
+    outputs = {"logo": brand_dir / "cognigenesis-logo.svg", "theme": brand_dir / "theme.json"}
     outputs["logo"].write_text(resource_text("cognigenesis-logo.svg"), encoding="utf-8")
     outputs["theme"].write_text(resource_text("theme.json"), encoding="utf-8")
     return outputs
@@ -54,20 +52,29 @@ def run_checks(settings: Settings | None = None) -> list[Check]:
     checks.append(Check("cogni", bool(shutil.which("cogni")), shutil.which("cogni") or "not on PATH", "Reinstall Cognigenesis or fix PATH"))
     checks.append(Check("cogni-acp", bool(shutil.which("cogni-acp")), shutil.which("cogni-acp") or "not on PATH", "Reinstall Cognigenesis or fix PATH"))
 
+    selected: str | None = settings.model
     try:
         models = list_models(settings.ollama_base_url, timeout=5)
         checks.append(Check("Ollama", True, f"reachable at {settings.ollama_base_url}"))
-        selected = settings.model or choose_model(models)
+        selected = selected or choose_model(models)
         if selected and selected in models:
             checks.append(Check("Model", True, selected))
         elif selected:
             checks.append(Check("Model", False, f"missing: {selected}", f"ollama pull {selected}"))
         elif models:
-            checks.append(Check("Model", True, models[0]))
+            selected = models[0]
+            checks.append(Check("Model", True, selected))
         else:
             checks.append(Check("Model", False, "no local Ollama models", "cogni setup --pull"))
     except Exception as exc:
         checks.append(Check("Ollama", False, f"not reachable: {exc}", "Start Ollama and run: ollama list"))
+
+    if selected:
+        profile = load_profile("ollama", selected)
+        if profile:
+            checks.append(Check("Qualification", True, f"{profile.tier.name} (score {profile.score:.3f})"))
+        else:
+            checks.append(Check("Qualification", False, f"no saved profile for {selected}", "cogni qualify"))
 
     legacy = detect_legacy_aionui_bridge()
     checks.append(Check(
