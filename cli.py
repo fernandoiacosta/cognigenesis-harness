@@ -12,8 +12,8 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
 from cognigenesis import __version__
-from cognigenesis.bootstrap import aionui_configuration, auto_setup, run_checks
-from cognigenesis.config import config_path, history_path, load_settings, save_settings
+from cognigenesis.bootstrap import aionui_configuration, auto_setup, pull_model, run_checks
+from cognigenesis.config import config_path, history_path, load_settings
 from cognigenesis.console import (
     RuntimeIdentity,
     assistant_message,
@@ -28,7 +28,6 @@ from core.stdio import configure_utf8_stdio
 from harness import build_engine
 from providers.base import ProviderError
 from providers.factory import provider_identity
-
 
 VERSION = __version__
 KNOWN_COMMANDS = {"run", "chat", "setup", "doctor", "aionui", "config"}
@@ -47,7 +46,6 @@ def _normalize_argv(argv: list[str]) -> list[str]:
         return ["chat"] if sys.stdin.isatty() else []
     if argv[0] in {"-h", "--help", "--version"} or argv[0] in KNOWN_COMMANDS:
         return argv
-    # Backward-compatible: cogni "prompt" and cogni --model x "prompt".
     return ["run", *argv]
 
 
@@ -67,6 +65,7 @@ def _parser() -> argparse.ArgumentParser:
     setup.add_argument("--model", default=None)
     setup.add_argument("--base-url", default=None)
     setup.add_argument("--timeout", type=float, default=None)
+    setup.add_argument("--pull", action="store_true", help="Pull the selected Ollama model if it is missing")
 
     doctor = sub.add_parser("doctor", help="Diagnose installation, Ollama, model, PATH, and AionUi")
     doctor.add_argument("--json", action="store_true", dest="as_json")
@@ -191,6 +190,13 @@ def _render_checks(checks) -> int:
 def _run_setup(args: argparse.Namespace) -> int:
     banner(VERSION)
     settings, checks = auto_setup(model=args.model, base_url=args.base_url, timeout=args.timeout)
+    if args.pull:
+        try:
+            console.print(f"[cogni.violet]Pulling Ollama model:[/] {settings.model}")
+            pull_model(settings.model or "llama3.1:8b")
+            settings, checks = auto_setup(model=settings.model, base_url=settings.ollama_base_url, timeout=settings.ollama_timeout)
+        except Exception as exc:
+            error_message(f"Could not pull model: {exc}")
     console.print(f"[cogni.muted]Config:[/] {config_path()}")
     console.print(f"[cogni.muted]Provider:[/] {settings.provider}")
     console.print(f"[cogni.muted]Model:[/] {settings.model}")
@@ -218,6 +224,7 @@ def _run_aionui(as_json: bool) -> int:
         ("Display name", cfg["display_name"], "cogni.cyan"),
         ("Command", cfg["command"], "cogni.green"),
         ("Arguments", "<empty>", ""),
+        ("Logo", cfg["image"], "cogni.magenta"),
     ])
     console.print("[cogni.muted]Environment[/]")
     for key, value in cfg["environment"].items():
