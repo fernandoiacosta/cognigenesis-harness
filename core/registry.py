@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import Any
 from core.types import Capability
 
 
@@ -14,12 +15,13 @@ class CapabilityRegistry:
     def get(self, capability_id: str) -> Capability | None:
         return self._items.get(capability_id)
 
-    def describe(self) -> list[dict[str, str]]:
+    def describe(self) -> list[dict[str, Any]]:
         return [
             {
                 "id": item.id,
                 "description": item.description,
                 "risk": item.risk,
+                "parameters": item.parameters,
             }
             for item in sorted(self._items.values(), key=lambda x: x.id)
         ]
