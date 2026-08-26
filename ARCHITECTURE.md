@@ -1,435 +1,239 @@
-# Cognigenesis Harness Architecture
+# Cognigenesis Harness v1.0 Architecture
 
-## 1. From a large integrated agent to a minimal runtime
+## Product invariant
 
-The development evolved from **build an agent** toward **build a minimal runtime that can grow an agent safely**.
+> Keep the execution kernel small. Move cognition, capabilities, interfaces, providers, and growth outward while keeping authority explicit.
 
-The original Cognigenesis vision naturally implied permanent subsystems for reasoning, memory, research, coding, artifacts, planning, tools, governance, knowledge graphs, simulation, multi-agent behavior, and self-evolution. Conceptually this is powerful, but each permanent subsystem increases coupling and architectural entropy.
+Cognigenesis Harness is not intended to hard-code every AI feature into a permanent subsystem. It provides a stable runtime that can discover and use bounded capabilities.
 
-The decisive realization was:
-
-> The system does not need to contain every capability. It needs to know how to reach capabilities.
-
-## 2. Minimal execution kernel
-
-The fundamental runtime remains approximately:
-
-```python
-while not done:
-    response = model(context, tools)
-
-    if response.tool_calls:
-        results = execute(response.tool_calls)
-        context += results
-    else:
-        return response
-```
-
-Everything else should justify its existence outside this loop.
-
-## 3. Capability introspection
-
-Capabilities live in a runtime registry and are discoverable rather than assumed from prompting.
-
-Examples:
-
-- `filesystem.read`
-- `filesystem.write`
-- `filesystem.list`
-- `shell.run`
-- `workspace.create_project`
-
-The model asks what actually exists instead of inheriting a static claim about tools.
-
-## 4. Markdown as cognitive control plane
-
-Executable machinery belongs in Python or TypeScript.
-
-Behavioral knowledge belongs in Markdown when possible:
-
-- `agent.md`
-- `modes/*.md`
-- `protocols/*.md`
-- `skills/**/SKILL.md`
-- `memory/*.md`
-
-This enables reversible, inspectable soft modification without rewriting trusted runtime code.
-
-## 5. Authority boundary
-
-Markdown may request or describe a capability, but declarations do not create executable power.
+## Runtime
 
 ```text
-Markdown declaration
-        │
-        ▼
-Trusted registry lookup
-    ┌───┴────┐
-  found    missing
-    │         │
- expose   capability gap
+Human terminal / ACP client
+          │
+          ▼
+   Interface layer
+   ├─ cogni (Rich + prompt-toolkit)
+   └─ cogni-acp (ACP stdio)
+          │
+          ▼
+Packaged Cognitive Control Plane
+          │
+          ▼
+    Context Compiler
+          │
+          ├─ durable conversation
+          ├─ runtime state
+          └─ capability schemas
+          │
+          ▼
+      Model Provider
+        (Ollama)
+          │
+          ▼
+    Execution Kernel
+          │
+     ┌────┴────┐
+     ▼         ▼
+   Policy   Model Trust
+     └────┬────┘
+          ▼
+ Capability Registry
+          │
+ ┌────────┼─────────────┐
+ ▼        ▼             ▼
+files   web/research   workspace
+                     shell (off by default)
 ```
 
-> Markdown describes capabilities. The runtime grants capabilities.
+## Canonical chat/tool transcript
 
-## 6. Soft and hard evolution
-
-### Level 1 — Prompt evolution
-
-Modify behavior documents such as `agent.md`, modes, and protocols.
-
-### Level 2 — Skill evolution
-
-Create reusable procedures from existing capabilities.
-
-### Level 3 — Tool evolution
-
-Add genuinely new executable primitives only when existing capabilities cannot express the required action.
-
-Hard extensions must pass:
+Multi-step execution preserves the standard ordering expected by chat/tool APIs:
 
 ```text
-generation
+user
+→ assistant(tool_calls)
+→ tool(result)
+→ assistant(tool_calls) ...
+→ assistant(final)
+```
+
+The current user message remains before all tool activity. This is important for reliable local-model reasoning across multiple tool steps.
+
+## Cognitive control plane
+
+Behavioral rules are Markdown. The canonical runtime copy is packaged under:
+
+```text
+cognigenesis/resources/agent.md
+```
+
+The repository-root `agent.md` mirrors it for review. Installed behavior therefore does not depend on the original Git checkout being present.
+
+Markdown can request or describe actions; it cannot grant executable authority.
+
+## Capability plane
+
+Capabilities are registered Python implementations with:
+
+- stable ID
+- description
+- risk classification
+- explicit JSON input schema
+- trusted execution function
+
+Current built-ins include:
+
+```text
+filesystem.read
+filesystem.write
+filesystem.list
+workspace.create_project
+web.search
+web.fetch
+shell.run
+```
+
+The model receives the actual runtime registry and JSON schemas rather than relying on prompt claims about what might exist.
+
+## Authority plane
+
+Execution requires two independent gates:
+
+```text
+runtime policy allows capability
+AND
+model trust tier >= capability minimum
+```
+
+`shell.run` is registered but disabled by runtime policy by default. Read-only public-web research is available at low trust; mutation remains more restricted.
+
+## Provider plane
+
+Ollama is the v1 local-first provider. Resolution precedence is:
+
+```text
+CLI flag
+→ environment variable
+→ persisted user configuration
+→ autodiscovered/default model
+```
+
+First-use setup prefers:
+
+1. `hasi-edge-AG:latest`
+2. `llama3.1:8b`
+3. first installed Ollama model
+
+`StubProvider` is retained only for explicit tests/demo mode.
+
+## State plane
+
+Workspace state lives under `.cognigenesis/` and is written atomically.
+
+The state store tracks:
+
+- current objective
+- recent runtime events
+- artifacts/goals scaffolding
+- bounded durable conversation history
+
+Terminal chat reopens the workspace conversation after process restart. `/new` clears it.
+
+ACP sessions isolate state under:
+
+```text
+.cognigenesis/sessions/<session-id>.json
+```
+
+## Research boundary
+
+`web.search` and `web.fetch` are evidence tools, not execution-authority tools.
+
+- fetched content is explicitly untrusted
+- important claims should be verified across sources
+- `web.fetch` blocks localhost/private/non-global network targets
+- web content cannot grant shell/filesystem authority
+
+## Interface plane
+
+### Terminal
+
+`cogni` owns human interaction:
+
+- styled Prime Dark theme
+- Markdown response rendering
+- persistent input history
+- auto-suggestions
+- setup/doctor/config/AionUi commands
+- one-shot compatibility
+
+### ACP
+
+`cogni-acp` owns machine interaction:
+
+- Python-native stdio transport
+- ACP initialization/session/prompt/update/cancel flow
+- no Node/`.cmd` prompt-time wrapper
+- UTF-8-only protocol stream
+- same execution engine and provider as the terminal
+
+## Configuration
+
+There is one persistent configuration source resolved by `platformdirs`. The obsolete repository `config.yaml` was removed.
+
+```text
+CLI
+→ environment
+→ user config
+→ defaults
+```
+
+This avoids code/config drift between terminal, ACP, and installed environments.
+
+## Packaging
+
+v1 is packaged as an installable wheel/sdist. The wheel includes:
+
+- runtime packages
+- cognitive control resource
+- theme tokens
+- Cognigenesis logo
+- both console entry points
+
+CI verifies those resources from outside the repository after installing the built wheel.
+
+## Installation flow
+
+```text
+platform installer
+→ authenticated package install/upgrade
+→ executable verification
+→ PATH repair (Windows user-site fallback)
+→ cogni setup
+→ Ollama/model diagnostics
+→ exported brand assets
+→ ready terminal + AionUi configuration
+```
+
+## Evolution principle
+
+Soft evolution—Markdown rules, modes, protocols, and skills—should remain cheap, inspectable, and reversible.
+
+Hard executable extension should require a later governed pipeline:
+
+```text
+proposal
 → static inspection
 → sandbox
 → tests
 → permission analysis
+→ policy approval
 → registration
 → observation
 → rollback
 ```
 
-## 7. State plane
+The architecture should continue following one asymmetry:
 
-Conversation history is not sufficient runtime state.
-
-The harness tracks:
-
-- objective
-- completed goals
-- open goals
-- actions
-- observations
-- artifacts
-- checkpoints
-- next actions
-
-The context compiler selects only relevant information for the model.
-
-## 8. Semantic capabilities
-
-Primitive tools remain available, but higher-order capabilities can safely compose them.
-
-Example:
-
-```text
-workspace.create_project
-        ↓
-filesystem operations
-        ↓
-project artifacts
-```
-
-This makes agent actions easier to audit and reason about.
-
-## 9. Capability-gap protocol
-
-When functionality is unavailable, the system should explicitly surface a gap rather than hallucinate success.
-
-Resolution order:
-
-```text
-missing capability
-→ can an existing primitive do it?
-→ can existing capabilities be composed?
-→ can a new SKILL.md solve it?
-→ is a genuinely new executable primitive required?
-```
-
-## 10. Architectural rule
-
-Whenever something can safely move out of the kernel, move it out.
-
----
-
-# 11. Deeper design philosophy
-
-The architecture follows a deliberate asymmetry:
-
-> Kernel complexity should grow slowly. Capability space can grow rapidly.
-
-```text
-     Kernel
-       │
-       │ stable
-       ▼
-┌──────────────┐
-│              │
-│ very small   │
-│              │
-└──────┬───────┘
-       │
-       │ supports
-       ▼
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-      CAPABILITY SPACE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-skills
-tools
-protocols
-agents
-memories
-providers
-artifacts
-interfaces
-workflows
-extensions
-future capabilities
-```
-
-The capability surface can become enormous. The kernel should not.
-
-# 12. Horizontal extension instead of vertical accumulation
-
-A conventional agent framework often grows vertically:
-
-```text
-v1  tool calls
-v2  + planner
-v3  + memory
-v4  + browser
-v5  + subagents
-v6  + workflows
-v7  + MCP
-v8  + RAG
-v9  + evaluation
-```
-
-Eventually those concepts become embedded in core execution.
-
-The Cognigenesis Harness instead attempts to make them horizontal extensions:
-
-```text
-                 µKERNEL
-                    │
-        ┌───────────┼────────────┐
-        ▼           ▼            ▼
-      skill       memory      subagent
-        ▼           ▼            ▼
-      plugin      plugin       plugin
-```
-
-A future multi-agent or swarm layer should be introducible without changing the fundamental recursive execution loop.
-
-# 13. Externalizing useful AI operation
-
-A useful AI assistant already operates conceptually as:
-
-```text
-understand intent
-↓
-inspect available tools
-↓
-choose capability
-↓
-execute
-↓
-inspect result
-↓
-adjust
-↓
-produce artifact or answer
-```
-
-The harness externalizes this pattern as:
-
-```text
-model
-+
-context compiler
-+
-capability registry
-+
-state
-+
-execution loop
-```
-
-The goal is not to simulate fictional intelligence. It is to build a clean runtime around explicit capability orchestration.
-
-# 14. Target project structure
-
-```text
-cogni-harness/
-│
-├── harness.py
-├── agent.md
-├── config.yaml
-├── workspace/
-│
-├── modes/
-│   ├── architect.md
-│   ├── investigator.md
-│   └── oracle.md
-│
-├── protocols/
-│   ├── core.md
-│   ├── recursive-loop.md
-│   ├── capability-gap.md
-│   └── architect-cycle.md
-│
-├── skills/
-│   ├── coding/SKILL.md
-│   ├── research/SKILL.md
-│   ├── project-synthesis/SKILL.md
-│   └── repository-audit/SKILL.md
-│
-├── tools/
-│   ├── filesystem.py
-│   ├── shell.py
-│   └── workspace.py
-│
-├── providers/
-│   ├── ollama.py
-│   ├── openai.py
-│   └── anthropic.py
-│
-├── artifacts/schemas/
-├── memory/
-│   ├── working.md
-│   └── projects/
-├── state/
-│   ├── sessions.jsonl
-│   ├── goals.json
-│   └── checkpoints/
-└── extensions/
-```
-
-# 15. Conceptual runtime
-
-```text
-                    USER
-                      │
-                      ▼
-                   GOAL
-                      │
-                      ▼
-              MARKDOWN GRAPH
-                      │
-                      ▼
-              CONTEXT COMPILER
-                      │
-                      ▼
-                 MODEL BUS
-                      │
-                      ▼
-              EXECUTION KERNEL
-               ▲            │
-               │            ▼
-          OBSERVATION   ACTION REQUEST
-               │            │
-               │            ▼
-               │          POLICY
-               │            │
-               │            ▼
-               │     CAPABILITY REGISTRY
-               │            │
-               │       ┌────┴─────┐
-               │       ▼          ▼
-               │     FOUND      MISSING
-               │       │          │
-               │       ▼          ▼
-               └── EXECUTE    CAPABILITY GAP
-                                  │
-                                  ▼
-                            EVOLUTION LAYER
-```
-
-# 16. Foundation-first milestone
-
-Do not add glamorous capabilities yet.
-
-Defer:
-
-- swarms
-- enormous memory architectures
-- autonomous recursive code mutation
-- broad plugin synthesis
-
-First prove:
-
-```text
-agent.md
-↓
-load Markdown graph
-↓
-real model provider
-↓
-capability registry
-↓
-workspace capability
-↓
-recursive execution
-↓
-goal tracking
-↓
-session log
-```
-
-Reference demonstration:
-
-```text
-$ cogni "Create a Python CLI project for tracking expenses"
-
-[architect mode loaded]
-[goal] Create functioning expense-tracker project
-[gather] workspace empty
-[model] project architecture prepared
-[action] workspace.create_project
-[result] files created
-[action] shell.run: python -m pytest
-[result] tests passed
-[learn] project operational
-[goal completed]
-```
-
-# 17. Evolution milestone
-
-Only after the foundation works reliably should capability-gap evolution be enabled.
-
-Reference demonstration:
-
-```text
-$ cogni "Inspect this SQLite database and create an HTML report"
-
-[capability discovery]
-sqlite inspection: unavailable
-
-[CAPABILITY_GAP]
-
-existing tools sufficient?
-No.
-
-[extension proposal]
-sqlite_inspector.py
-
-[validation]
-passed
-
-[sandbox]
-passed
-
-[registration]
-sqlite.inspect
-
-[retry]
-[execution]
-success
-[artifact]
-report.html
-[goal completed]
-```
-
-At that point the system transitions from a configurable agent into a small trusted runtime supporting an adaptive and expandable cognitive environment.
-
-> Push mutable intelligence outward while keeping executable authority explicit, inspectable, bounded, and minimal.
+> Kernel complexity grows slowly; capability space may grow rapidly; authority grows only with evidence.
