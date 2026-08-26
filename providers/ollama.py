@@ -45,16 +45,14 @@ class OllamaProvider(ModelProvider):
             detail = exc.read().decode("utf-8", errors="replace")
             if exc.code == 404 or "model" in detail.lower() and "not found" in detail.lower():
                 raise ProviderError(
-                    f"Ollama model '{self.model}' is not available. "
-                    f"Run: ollama pull {self.model}"
+                    f"Ollama model '{self.model}' is not available. Run: ollama pull {self.model}"
                 ) from exc
             raise ProviderError(
                 f"Ollama returned HTTP {exc.code} from {self.base_url}: {detail or exc.reason}"
             ) from exc
         except (error.URLError, ConnectionError, socket.timeout, TimeoutError, OSError) as exc:
             raise ProviderError(
-                f"Ollama is not reachable at {self.base_url}. "
-                "Start Ollama and verify it with: ollama list"
+                f"Ollama is not reachable at {self.base_url}. Start Ollama and verify it with: ollama list"
             ) from exc
         except json.JSONDecodeError as exc:
             raise ProviderError("Ollama returned an invalid JSON response.") from exc
@@ -63,8 +61,7 @@ class OllamaProvider(ModelProvider):
             message = str(body["error"])
             if "model" in message.lower() and ("not found" in message.lower() or "pull" in message.lower()):
                 raise ProviderError(
-                    f"Ollama model '{self.model}' is not available. "
-                    f"Run: ollama pull {self.model}"
+                    f"Ollama model '{self.model}' is not available. Run: ollama pull {self.model}"
                 )
             raise ProviderError(f"Ollama error: {message}")
 
@@ -99,13 +96,18 @@ class OllamaProvider(ModelProvider):
             + "\n\nCurrent runtime state:\n"
             + json.dumps(state, ensure_ascii=False)
         )
-        messages = [{"role": "system", "content": system + system_suffix}]
+        messages: list[dict] = [{"role": "system", "content": system + system_suffix}]
+
         for item in context.get("history", []):
-            if "observation" in item:
+            role = item.get("role")
+            if role in {"user", "assistant"} and isinstance(item.get("content"), str):
+                messages.append({"role": role, "content": item["content"]})
+            elif role == "tool" or "observation" in item:
                 messages.append({
                     "role": "tool",
-                    "content": json.dumps(item["observation"], ensure_ascii=False),
+                    "content": json.dumps(item.get("observation", item), ensure_ascii=False),
                 })
+
         messages.append({"role": "user", "content": context.get("objective", "")})
         return messages
 
