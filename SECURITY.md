@@ -2,30 +2,37 @@
 
 ## Trust Boundary
 
-Markdown is untrusted behavioral input. It does not create executable authority.
-
-Only capabilities registered by trusted runtime code can execute.
+Markdown and retrieved content are behavioral/evidentiary inputs. They do not create executable authority. Only capabilities registered by trusted runtime code can execute.
 
 ## Model Trust Boundary
 
-Connecting a model does not grant that model authority.
+Connecting a model does not grant that model authority. Every model is associated with a `ModelProfile` and trust tier. Execution requires both:
 
-Every model is associated with a `ModelProfile` and trust tier. The runtime requires both:
+1. runtime policy approval, and
+2. a model trust tier at or above the capability minimum.
 
-1. explicit capability approval by runtime policy, and
-2. a model trust tier at or above the capability's minimum tier.
+Unknown/unqualified models start restricted. Qualification is a risk-control mechanism, not proof of universal alignment.
 
-Unknown or unqualified models default to restricted authority. A strong harness must not automatically amplify an unreliable model.
+## Cognitive Control Plane Packaging
 
-Qualification is a risk-control mechanism, not proof of universal model alignment. Provider-specific evaluations must be run and updated as models change.
+The canonical `agent.md` used at runtime is packaged inside `cognigenesis.resources`. Installed behavior therefore does not silently disappear when the repository root is absent. The repository copy mirrors the packaged copy for review.
+
+## Configuration
+
+There is one supported user configuration source: the OS-standard Cognigenesis config directory resolved by `platformdirs`. Precedence is:
+
+```text
+CLI flags
+→ environment variables
+→ persisted user configuration
+→ safe defaults
+```
+
+The previous unused `config.yaml` was removed to avoid configuration drift.
 
 ## ACP / AionUi Transport Boundary
 
-`cogni-acp` is a transport adapter, not an authority adapter.
-
-AionUi launches Cognigenesis as an ACP subprocess and supplies the user-selected project directory as the session working directory. The ACP bridge may also receive additional directory descriptors or MCP server descriptors from a client; these are **not automatically registered as Cognigenesis capabilities**.
-
-The authority path remains:
+`cogni-acp` is a transport adapter, not an authority adapter. Client-provided additional directories or MCP descriptors are not automatically registered as executable Cognigenesis capabilities.
 
 ```text
 ACP client
@@ -39,38 +46,34 @@ Runtime Policy + Model Trust Gate
 Capability Registry
 ```
 
-ACP owns stdout for the lifetime of `cogni-acp`. Human-readable banners, debug prints, or other non-protocol stdout output can corrupt the JSON-RPC stream and must not be added to the ACP entry point. Diagnostics should use stderr or structured ACP updates.
+ACP owns stdout. Non-protocol banners/debug prints must never be added to `cogni-acp`. Human diagnostics belong on stderr or in structured agent updates.
 
-Each ACP conversation receives a session-specific state file under `.cognigenesis/sessions/` so multiple conversations in the same project do not overwrite one shared runtime state document.
-
-ACP cancellation is cooperative. The kernel checks the cancellation signal before model steps and before capability execution. A blocking provider or capability cannot be forcibly interrupted until control returns to the kernel; provider-specific adapters should implement native cancellation where available.
+ACP cancellation is cooperative; blocking provider/tool calls can stop only when control returns unless a future provider adds native cancellation.
 
 ## Filesystem
 
-All built-in filesystem and workspace operations resolve paths relative to the configured workspace and reject traversal outside it.
+Built-in filesystem/workspace operations resolve paths under the configured workspace and reject traversal outside it.
 
-For ACP sessions, that workspace is the project directory selected by the client/user when the session is created.
+State files are written atomically using a temporary file followed by replacement. Corrupt state is preserved with a `.corrupt` suffix rather than overwritten silently.
+
+## Web Research / SSRF
+
+`web.search` and `web.fetch` are read-only evidence capabilities. Retrieved content is explicitly untrusted.
+
+`web.fetch` only accepts HTTP(S) URLs whose resolved addresses are public/global. It blocks localhost, `.local`, private, loopback, link-local, reserved, multicast, and other non-global targets so the research tool is not an implicit private-network/metadata-service fetch primitive.
+
+DNS rebinding and proxy-layer behavior remain environment-level risks; deployments with stronger network isolation requirements should enforce egress policy outside the process as well.
 
 ## Shell
 
-`shell.run` is registered but **disabled by default**, even for highly qualified models. It requires explicit runtime opt-in plus the required model trust tier.
+`shell.run` is registered but **disabled by default**, including for highly qualified models. It requires explicit runtime opt-in plus the required trust tier.
 
-Commands use `shlex.split` and `shell=False`, but running with the workspace as the current directory is not equivalent to an operating-system sandbox. Shell authority should remain disabled until a stronger process/filesystem sandbox is implemented or an operator deliberately accepts that risk.
+Commands use argument arrays, `shell=False`, UTF-8 replacement decoding, a workspace cwd, and a bounded timeout. This is not equivalent to an OS sandbox; shell authority should remain disabled unless the operator deliberately accepts that risk or a stronger sandbox is added.
 
 ## Policy Source of Truth
 
-`core/capability_policy.py` defines capability minimum trust tiers. `core/policy.py` enforces runtime authority. `config.yaml` points to these sources rather than duplicating capability grants.
+`core/capability_policy.py` defines capability minimum trust tiers. `core/policy.py` enforces runtime authority. User configuration cannot self-grant capabilities that runtime policy does not expose.
 
 ## Extension Policy
 
-Executable extension remains intentionally gated. A future extension system must include:
-
-- static inspection
-- sandbox execution
-- tests
-- explicit permission declaration
-- policy approval
-- model trust-tier analysis
-- registration
-- observation
-- rollback
+Executable extension remains intentionally gated. A future extension system must include static inspection, sandbox execution, tests, explicit permission declaration, policy approval, model trust analysis, registration, observation, and rollback.
