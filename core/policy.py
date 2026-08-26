@@ -16,7 +16,7 @@ class Policy:
         self.workspace = workspace.resolve()
         self.model_profile = model_profile or UNQUALIFIED_PROFILE
         self.allow_shell = allow_shell
-        self.allowed_prefixes = ("core.", "filesystem.", "workspace.")
+        self.allowed_prefixes = ("core.", "filesystem.", "workspace.", "web.")
 
     def _runtime_allows(self, capability_id: str) -> bool:
         if capability_id.startswith(self.allowed_prefixes):
