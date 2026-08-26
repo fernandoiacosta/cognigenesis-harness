@@ -1,0 +1,17 @@
+{
+  "name": "Cognigenesis Prime Dark",
+  "version": "1.0.0",
+  "colors": {
+    "background": "#05070D",
+    "surface": "#0B1020",
+    "border": "#1B2440",
+    "text": "#F3F7FF",
+    "muted": "#A7B0C3",
+    "cyan": "#62F5FF",
+    "violet": "#8B7CFF",
+    "magenta": "#C96CFF",
+    "green": "#54E6A8",
+    "amber": "#FFC857",
+    "red": "#FF6B7A"
+  }
+}
