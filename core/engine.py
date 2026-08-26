@@ -27,6 +27,9 @@ class ExecutionEngine:
         self.state = state
         self.max_steps = max_steps
         self.cancel_event = cancel_event
+        # Conversation history belongs to the engine/session, not to one run call.
+        # A terminal chat or ACP session reuses the same engine across turns.
+        self.history: list[dict] = []
 
     def _is_cancelled(self) -> bool:
         return bool(self.cancel_event and self.cancel_event.is_set())
@@ -38,9 +41,16 @@ class ExecutionEngine:
         self.state.record_event("cancelled", payload)
         return "Execution cancelled by client."
 
+    def reset_conversation(self) -> None:
+        self.history.clear()
+        self.state.record_event("conversation_reset", {})
+
+    def conversation_history(self) -> list[dict]:
+        return list(self.history)
+
     def run(self, objective: str) -> str:
-        history: list[dict] = []
         self.state.set_objective(objective)
+        turn_items: list[dict] = []
 
         if self._is_cancelled():
             return self._cancelled_result()
@@ -49,18 +59,28 @@ class ExecutionEngine:
             if self._is_cancelled():
                 return self._cancelled_result(step)
 
-            context = self.context_compiler.compile(objective, history)
+            working_history = self.history + turn_items
+            context = self.context_compiler.compile(objective, working_history)
             response = self.provider.generate(context)
 
             if self._is_cancelled():
                 return self._cancelled_result(step)
 
             if response.final is not None:
+                self.history.append({"role": "user", "content": objective})
+                self.history.extend(turn_items)
+                self.history.append({"role": "assistant", "content": response.final})
+                # Bound in-memory context growth. Richer long-term state remains in StateStore.
+                self.history = self.history[-80:]
                 self.state.record_event("final", {"step": step, "text": response.final})
                 return response.final
 
             if not response.tool_calls:
                 gap = "CAPABILITY_GAP: model returned neither a final answer nor an executable tool call"
+                self.history.append({"role": "user", "content": objective})
+                self.history.extend(turn_items)
+                self.history.append({"role": "assistant", "content": gap})
+                self.history = self.history[-80:]
                 self.state.record_event("capability_gap", {"step": step, "reason": gap})
                 return gap
 
@@ -97,9 +117,18 @@ class ExecutionEngine:
                                 "reason": str(exc),
                             }
 
-                history.append({"tool_call": call.name, "arguments": call.arguments, "observation": observation})
+                turn_items.append({
+                    "role": "tool",
+                    "tool_call": call.name,
+                    "arguments": call.arguments,
+                    "observation": observation,
+                })
                 self.state.record_event("tool_observation", observation)
 
         result = f"Stopped after max_steps={self.max_steps} without a final answer."
+        self.history.append({"role": "user", "content": objective})
+        self.history.extend(turn_items)
+        self.history.append({"role": "assistant", "content": result})
+        self.history = self.history[-80:]
         self.state.record_event("max_steps", {"reason": result})
         return result
