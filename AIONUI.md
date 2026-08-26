@@ -1,10 +1,8 @@
 # AionUi Integration
 
-Cognigenesis Harness v0.5.0 is a Python-native ACP agent backed by Ollama by default, with persistent multi-turn conversation context per ACP session.
+Cognigenesis Harness v0.6.0 is a Python-native ACP agent backed by Ollama by default, with persistent multi-turn context and read-only web research.
 
 ## Install / upgrade
-
-Because this repository is private, install from an authenticated Git checkout:
 
 ```powershell
 python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
@@ -14,57 +12,23 @@ Verify:
 
 ```powershell
 cogni --version
+cogni doctor
 where.exe cogni-acp
 ```
 
-Expected version: `cognigenesis-harness 0.5.0`.
+Expected version: `cognigenesis-harness 0.6.0`.
 
-## Ollama setup
+## Important: remove the old local workaround from the execution path
 
-Verify Ollama is running and inspect local models:
-
-```powershell
-ollama list
-```
-
-Pull the default model if needed:
-
-```powershell
-ollama pull llama3.1:8b
-```
-
-Or use another installed model:
-
-```powershell
-$env:COGNI_OLLAMA_MODEL = "hasi-edge-AG:latest"
-```
-
-Supported environment variables:
+If an AionUi error traceback contains:
 
 ```text
-COGNI_PROVIDER=ollama
-COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
-COGNI_OLLAMA_MODEL=llama3.1:8b
-COGNI_OLLAMA_TIMEOUT=120
+%APPDATA%\AionUi\cognigenesis\cognigenesis_ollama.py
 ```
 
-## Test in the terminal first
+then that conversation is **not using the packaged `cogni-acp` agent**. It is still using the legacy local bridge.
 
-One-shot:
-
-```powershell
-cogni --provider ollama --model llama3.1:8b "Say OK"
-```
-
-Interactive chat:
-
-```powershell
-cogni chat --provider ollama --model llama3.1:8b --workspace .
-```
-
-## Configure AionUi Custom Agent
-
-Open **Settings → Agent Management → Custom Agents** and use:
+Configure the Custom Agent as:
 
 ```text
 Display Name: Cognigenesis
@@ -72,9 +36,58 @@ Command: cogni-acp
 Arguments: <leave empty>
 ```
 
-### Logo
+Then restart AionUi and start a new Cognigenesis conversation. `cogni doctor` will warn if the legacy file is still present.
 
-Use the Cognigenesis brand mark instead of the generic robot avatar.
+## Ollama setup
+
+```powershell
+ollama list
+```
+
+Pull a model if needed:
+
+```powershell
+ollama pull llama3.1:8b
+```
+
+Recommended environment variables:
+
+```text
+COGNI_PROVIDER=ollama
+COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+COGNI_OLLAMA_MODEL=hasi-edge-AG:latest
+COGNI_OLLAMA_TIMEOUT=300
+```
+
+For a slower model or long research task, use `600` or higher for `COGNI_OLLAMA_TIMEOUT`.
+
+## Test in terminal first
+
+```powershell
+cogni --provider ollama --model hasi-edge-AG:latest "Say OK"
+cogni --provider ollama --model hasi-edge-AG:latest "Research online and compare current agent harnesses"
+```
+
+Interactive chat:
+
+```powershell
+cogni chat --provider ollama --model hasi-edge-AG:latest --workspace .
+```
+
+## Web research
+
+v0.6 registers two read-only capabilities:
+
+```text
+web.search
+web.fetch
+```
+
+When the user asks to research online, compare current systems, verify claims, or retrieve current information, the Ollama provider is instructed to call these tools before answering and cite returned URLs.
+
+External pages are marked untrusted and cannot grant mutation authority.
+
+## Logo
 
 Canonical source:
 
@@ -82,89 +95,42 @@ Canonical source:
 assets/brand/cognigenesis-logo.svg
 ```
 
-AionUi's Custom Agent form exposes **Upload image**. Export the SVG to a 512×512 PNG and upload that PNG as the agent image.
+Export to 512×512 PNG for AionUi's **Upload image** field.
 
-Branding source of truth:
+## Persistent ACP context
 
-```text
-BRANDING.md
-assets/brand/theme.json
-assets/brand/theme.css
-```
+Each AionUi conversation owns one Cognigenesis `ExecutionEngine`; repeated `session/prompt` calls reuse its prior user/assistant history.
 
-If AionUi does not inherit your shell environment, add these in the agent's **Environment Variables** section:
-
-```text
-COGNI_PROVIDER=ollama
-COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
-COGNI_OLLAMA_MODEL=hasi-edge-AG:latest
-COGNI_OLLAMA_TIMEOUT=120
-```
-
-Use a model name shown by `ollama list`.
-
-## Persistent ACP conversation context
-
-Each AionUi conversation owns one Cognigenesis `ExecutionEngine`. Repeated `session/prompt` calls reuse that engine and therefore preserve prior user/assistant turns in model context.
-
-```text
-session/new
-  ↓
-engine created
-  ↓
-prompt 1 → history retained
-  ↓
-prompt 2 → prior turn included
-  ↓
-prompt 3 → prior turns included
-```
-
-This is real multi-turn context, not just shared files or a changing state snapshot.
-
-Each ACP session also gets isolated runtime state under:
+Runtime state is isolated under:
 
 ```text
 <project>/.cognigenesis/sessions/<session-id>.json
 ```
 
-## Windows spawn behavior
+## Windows behavior
 
-`cogni-acp` is a Python-native ACP stdio server. It does not spawn a Node `.cmd` wrapper during `session/prompt`, avoiding the Windows `spawn EINVAL` failure mode seen with wrapper-based bridges.
+`cogni-acp` is Python-native and does not spawn Node `.cmd` wrappers during `session/prompt`, avoiding the earlier `spawn EINVAL` failure mode.
 
-The package entry point launches Python code directly. The ACP regression test launches the bridge with `sys.executable`, `-m`, `acp_bridge` as an argument array rather than through a `.cmd` shell wrapper.
+v0.6 also forces UTF-8 stdio, preventing Windows `cp1252` crashes when model output contains emoji or other Unicode characters.
 
-## ACP lifecycle
+## Actionable errors
 
-```text
-AionUi
-  ↓ spawn cogni-acp
-initialize
-  ↓
-session/new
-  ↓
-session/prompt
-  ↓
-Cognigenesis execution kernel + conversation history
-  ↓
-Ollama /api/chat
-  ↓
-session/update
-  ↓
-end_turn
-```
-
-## Actionable provider errors
-
-If Ollama is down, Cognigenesis reports:
+If Ollama is down:
 
 ```text
-Provider error: Ollama is not reachable at http://127.0.0.1:11434. Start Ollama and verify it with: ollama list
+Provider error: Ollama is not reachable at http://127.0.0.1:11434...
 ```
 
-If the configured model is missing, Cognigenesis reports the model and suggests:
+If generation exceeds the configured timeout:
+
+```text
+Provider error: Ollama timed out after <N>s while generating with model '<model>'...
+```
+
+If the model is missing:
 
 ```text
 ollama pull <model>
 ```
 
-Known provider failures are returned to AionUi as agent messages with a normal ACP `end_turn` instead of leaking an opaque internal error whenever possible.
+Known provider/runtime failures are returned as agent messages with an ACP `end_turn` whenever possible instead of opaque `UNKNOWN_UPSTREAM_ERROR` failures.
