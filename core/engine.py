@@ -63,7 +63,10 @@ class ExecutionEngine:
             if self._is_cancelled():
                 return self._cancelled_result(step)
 
-            context = self.context_compiler.compile(objective, self.history + turn_items)
+            # The live user message must precede any assistant tool calls/results.
+            working_history = self.history + [{"role": "user", "content": objective, "current_turn": True}] + turn_items
+            context = self.context_compiler.compile(objective, working_history)
+            context["objective_in_history"] = True
             response = self.provider.generate(context)
 
             if self._is_cancelled():
@@ -80,7 +83,6 @@ class ExecutionEngine:
                 self.state.record_event("capability_gap", {"step": step, "reason": gap})
                 return gap
 
-            # Preserve the canonical assistant(tool_calls) -> tool(result) transcript.
             turn_items.append({
                 "role": "assistant",
                 "tool_calls": [
