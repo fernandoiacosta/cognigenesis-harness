@@ -11,20 +11,21 @@ if command -v gh >/dev/null 2>&1; then
 fi
 
 if command -v uv >/dev/null 2>&1; then
-  uv tool install "$PACKAGE"
-  printf '\nInstalled: cogni\n'
+  uv tool install --force "$PACKAGE"
+  printf '\nInstalled/updated: cogni, cogni-acp\n'
   exit 0
 fi
 
 if command -v pipx >/dev/null 2>&1; then
-  pipx install "$PACKAGE"
-  printf '\nInstalled: cogni\n'
+  pipx install --force "$PACKAGE"
+  printf '\nInstalled/updated: cogni, cogni-acp\n'
   exit 0
 fi
 
 if command -v python3 >/dev/null 2>&1; then
-  python3 -m pip install --user "$PACKAGE"
-  printf '\nInstalled. Ensure your user Python bin directory is on PATH, then run: cogni --help\n'
+  python3 -m pip install --user --upgrade "$PACKAGE"
+  printf '\nInstalled/updated. Ensure your user Python bin directory is on PATH, then run: cogni --help\n'
+  printf 'ACP entry point: cogni-acp\n'
   exit 0
 fi
 
