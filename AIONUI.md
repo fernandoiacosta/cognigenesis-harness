@@ -1,136 +1,140 @@
-# AionUi Integration
+# AionUi Integration — Cognigenesis Harness v1.0
 
-Cognigenesis Harness v0.6.0 is a Python-native ACP agent backed by Ollama by default, with persistent multi-turn context and read-only web research.
+Cognigenesis is a Python-native ACP-over-stdio agent. The supported AionUi path is the packaged `cogni-acp` executable—no local bridge script, Node wrapper, or `.cmd` spawn is required.
 
-## Install / upgrade
-
-```powershell
-python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
-```
-
-Verify:
-
-```powershell
-cogni --version
-cogni doctor
-where.exe cogni-acp
-```
-
-Expected version: `cognigenesis-harness 0.6.0`.
-
-## Important: remove the old local workaround from the execution path
-
-If an AionUi error traceback contains:
+## 1. Install and configure Cognigenesis
 
 ```text
-%APPDATA%\AionUi\cognigenesis\cognigenesis_ollama.py
+cogni setup
+cogni doctor
 ```
 
-then that conversation is **not using the packaged `cogni-acp` agent**. It is still using the legacy local bridge.
+Then generate the exact AionUi configuration for this machine:
 
-Configure the Custom Agent as:
+```text
+cogni aionui
+```
+
+That command prints:
+
+- display name
+- absolute `cogni-acp` executable path
+- empty arguments
+- Ollama environment variables
+- exported Cognigenesis logo path
+
+Use those values in **Settings → Agent Management → Custom Agents**.
+
+## 2. Custom Agent values
+
+Typical configuration:
 
 ```text
 Display Name: Cognigenesis
-Command: cogni-acp
-Arguments: <leave empty>
+Command:      C:\...\cogni-acp.exe   (Windows)
+              /.../cogni-acp         (macOS/Linux)
+Arguments:    <empty>
 ```
 
-Then restart AionUi and start a new Cognigenesis conversation. `cogni doctor` will warn if the legacy file is still present.
-
-## Ollama setup
-
-```powershell
-ollama list
-```
-
-Pull a model if needed:
-
-```powershell
-ollama pull llama3.1:8b
-```
-
-Recommended environment variables:
+Environment:
 
 ```text
 COGNI_PROVIDER=ollama
 COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
-COGNI_OLLAMA_MODEL=hasi-edge-AG:latest
+COGNI_OLLAMA_MODEL=<model selected by cogni setup>
 COGNI_OLLAMA_TIMEOUT=300
+PYTHONUTF8=1
 ```
 
-For a slower model or long research task, use `600` or higher for `COGNI_OLLAMA_TIMEOUT`.
+For slower local models or long research tasks, raise `COGNI_OLLAMA_TIMEOUT` to `600` or more.
 
-## Test in terminal first
+## 3. Logo
 
-```powershell
-cogni --provider ollama --model hasi-edge-AG:latest "Say OK"
-cogni --provider ollama --model hasi-edge-AG:latest "Research online and compare current agent harnesses"
-```
+`cogni setup` exports a stable installed copy of the Cognigenesis logo to the OS user-data directory. `cogni aionui` prints that exact path. Use it in AionUi's **Upload image** field.
 
-Interactive chat:
-
-```powershell
-cogni chat --provider ollama --model hasi-edge-AG:latest --workspace .
-```
-
-## Web research
-
-v0.6 registers two read-only capabilities:
-
-```text
-web.search
-web.fetch
-```
-
-When the user asks to research online, compare current systems, verify claims, or retrieve current information, the Ollama provider is instructed to call these tools before answering and cite returned URLs.
-
-External pages are marked untrusted and cannot grant mutation authority.
-
-## Logo
-
-Canonical source:
+The repository source remains:
 
 ```text
 assets/brand/cognigenesis-logo.svg
 ```
 
-Export to 512×512 PNG for AionUi's **Upload image** field.
+## 4. Remove the legacy workaround from the execution path
 
-## Persistent ACP context
-
-Each AionUi conversation owns one Cognigenesis `ExecutionEngine`; repeated `session/prompt` calls reuse its prior user/assistant history.
-
-Runtime state is isolated under:
+If any traceback contains:
 
 ```text
-<project>/.cognigenesis/sessions/<session-id>.json
+%APPDATA%\AionUi\cognigenesis\cognigenesis_ollama.py
 ```
 
-## Windows behavior
+that conversation is still using the old workaround instead of v1 `cogni-acp`.
 
-`cogni-acp` is Python-native and does not spawn Node `.cmd` wrappers during `session/prompt`, avoiding the earlier `spawn EINVAL` failure mode.
-
-v0.6 also forces UTF-8 stdio, preventing Windows `cp1252` crashes when model output contains emoji or other Unicode characters.
-
-## Actionable errors
-
-If Ollama is down:
+Fix the Custom Agent command to the absolute path printed by:
 
 ```text
-Provider error: Ollama is not reachable at http://127.0.0.1:11434...
+cogni aionui
 ```
 
-If generation exceeds the configured timeout:
+Then fully restart AionUi and create a **new** Cognigenesis conversation. `cogni doctor` detects the legacy file and warns about it.
+
+## 5. ACP lifecycle
 
 ```text
-Provider error: Ollama timed out after <N>s while generating with model '<model>'...
+AionUi
+  │ spawn Python-native cogni-acp
+  ▼
+initialize
+  ▼
+session/new
+  ▼
+session/prompt
+  ▼
+Cognigenesis ExecutionEngine
+  ├─ durable conversation context
+  ├─ policy/model-trust gate
+  ├─ Ollama
+  └─ registered tools
+  ▼
+session/update
+  ▼
+end_turn
 ```
 
-If the model is missing:
+Each ACP conversation owns one engine and one isolated state file:
 
 ```text
-ollama pull <model>
+<workspace>/.cognigenesis/sessions/<session-id>.json
 ```
 
-Known provider/runtime failures are returned as agent messages with an ACP `end_turn` whenever possible instead of opaque `UNKNOWN_UPSTREAM_ERROR` failures.
+## 6. Research and tool use
+
+The ACP agent uses the same runtime as the terminal. Research requests may call `web.search` and `web.fetch`; filesystem/workspace capabilities are trust-gated; shell authority is disabled by default.
+
+The tool transcript follows the canonical chat ordering:
+
+```text
+user
+→ assistant(tool_calls)
+→ tool(result)
+→ assistant
+```
+
+## 7. Windows hardening
+
+v1 specifically avoids the failure modes observed during development:
+
+- no Node `.cmd` wrapper during `session/prompt` → avoids `spawn EINVAL`
+- UTF-8 stdio → avoids `cp1252`/emoji crashes
+- absolute installed executable available from `cogni aionui` → avoids PATH ambiguity
+- classified Ollama connection/model/timeout errors → avoids opaque upstream failures where possible
+
+## 8. Verification
+
+Before testing AionUi:
+
+```text
+cogni --version
+cogni doctor
+cogni "Say exactly: OK"
+```
+
+Then restart AionUi, open a new Cognigenesis conversation, and send the same prompt.
