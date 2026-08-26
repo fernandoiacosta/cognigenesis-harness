@@ -2,87 +2,31 @@
 
 ![Cognigenesis logo](assets/brand/cognigenesis-logo.svg)
 
-A minimal, extensible agent runtime built around one central principle:
+A local-first conversational agent runtime with Ollama, ACP-over-stdio support for AionUi, trust-gated capabilities, persistent chat, and read-only web research.
 
-> Keep the execution kernel extremely small. Move cognition, procedures, and growth outward into composable capabilities and Markdown control documents.
+## v0.6.0 — research + Windows hardening
 
-## Runtime architecture
+This release fixes three concrete failure modes seen in AionUi/Windows:
 
-```text
-objective / conversation turn
-  ↓
-Markdown control plane
-  ↓
-context compiler
-  ↓
-selected model provider
-  ↓
-execution kernel
-  ↓
-policy + model trust gate
-  ↓
-capability registry
-  ↓
-observation / repeat
-```
+1. **Long Ollama prompts timing out** — default timeout is now 300s and timeout errors are classified separately from connection failures.
+2. **Windows cp1252 crashes on emoji/Unicode** — `cogni`, `cogni-acp`, and the direct harness entry point force UTF-8 stdio.
+3. **"Research online" without a web tool** — Cognigenesis now registers read-only `web.search` and `web.fetch` capabilities and instructs Ollama to use them for current/online research requests.
 
-## v0.5.0: persistent conversation sessions
-
-Cognigenesis now supports true multi-turn terminal chat and persistent ACP conversation context.
-
-Interactive terminal mode:
+It also adds:
 
 ```powershell
-cogni chat --provider ollama --model llama3.1:8b --workspace .
+cogni doctor
 ```
 
-Example:
+which checks the installed executables, Python/stdout encoding, Ollama reachability/model availability, and warns if the old AionUi workaround script still exists at:
 
 ```text
-Cognigenesis Harness 0.5.0
-Provider:  ollama
-Model:     llama3.1:8b
-Workspace: C:\project
-
-You > inspect this repository
-Cogni > ...
-
-You > now focus on the provider layer
-Cogni > ...
+%APPDATA%\AionUi\cognigenesis\cognigenesis_ollama.py
 ```
 
-Chat commands:
-
-```text
-/help          Show commands
-/new           Clear conversational context
-/state         Show runtime state
-/capabilities  List registered capabilities
-/provider      Show provider/model
-/workspace     Show workspace
-/exit          Leave chat
-```
-
-The same `ExecutionEngine` now retains prior user/assistant turns across repeated `run()` calls, so AionUi ACP sessions also preserve real conversation context instead of behaving as unrelated one-shot prompts.
-
-## Ollama execution
-
-Normal execution is **Ollama-backed by default**. `StubProvider` remains available only when explicitly selected for tests/demo mode.
-
-Default Ollama settings:
-
-```text
-COGNI_PROVIDER=ollama
-COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
-COGNI_OLLAMA_MODEL=llama3.1:8b
-COGNI_OLLAMA_TIMEOUT=120
-```
-
-Any installed Ollama model can be selected, including custom models such as `hasi-edge-AG:latest`.
+If that warning appears, AionUi may still be bypassing the packaged ACP agent.
 
 ## Install / upgrade
-
-Requires Python 3.11–3.14 and authenticated access to this private repository.
 
 ```powershell
 python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
@@ -92,34 +36,43 @@ Verify:
 
 ```powershell
 cogni --version
+cogni doctor
 where.exe cogni-acp
 ollama list
 ```
 
-## One-shot terminal usage
+Expected version: `cognigenesis-harness 0.6.0`.
+
+## Terminal chat
 
 ```powershell
-cogni --provider ollama --model llama3.1:8b "Say OK"
+cogni chat --provider ollama --model hasi-edge-AG:latest --workspace .
 ```
 
-Or configure once for the current shell:
+One-shot execution still works:
 
 ```powershell
-$env:COGNI_OLLAMA_MODEL = "hasi-edge-AG:latest"
-cogni chat --workspace .
+cogni --provider ollama --model hasi-edge-AG:latest "Research online and compare modern agent harnesses"
 ```
 
-If Ollama is unavailable, Cognigenesis returns an actionable provider error. If the model is missing, it names the model and suggests `ollama pull <model>`.
+Default Ollama environment:
+
+```text
+COGNI_PROVIDER=ollama
+COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
+COGNI_OLLAMA_MODEL=llama3.1:8b
+COGNI_OLLAMA_TIMEOUT=300
+```
+
+For a slow local model, increase the timeout explicitly:
+
+```powershell
+$env:COGNI_OLLAMA_TIMEOUT = "600"
+```
 
 ## AionUi custom ACP agent
 
-Cognigenesis ships a Python-native ACP-over-stdio entry point:
-
-```text
-cogni-acp
-```
-
-Configure AionUi:
+Configure AionUi Custom Agent as:
 
 ```text
 Display name: Cognigenesis
@@ -127,22 +80,37 @@ Command:      cogni-acp
 Arguments:    <empty>
 ```
 
-Recommended AionUi environment variables:
+Recommended environment variables:
 
 ```text
 COGNI_PROVIDER=ollama
 COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
 COGNI_OLLAMA_MODEL=hasi-edge-AG:latest
-COGNI_OLLAMA_TIMEOUT=120
+COGNI_OLLAMA_TIMEOUT=300
 ```
 
-The ACP bridge is Python-native and does not launch Node `.cmd` wrappers during `session/prompt`, avoiding the Windows `spawn EINVAL` workaround that was previously required.
+**Do not point AionUi at the old local `cognigenesis_ollama.py` bridge.** The packaged `cogni-acp` process is the maintained path.
 
 See [`AIONUI.md`](AIONUI.md).
 
+## Research capabilities
+
+Cognigenesis now exposes:
+
+```text
+web.search  Search the public web (read-only)
+web.fetch   Fetch readable text from public HTTP(S) pages (read-only)
+```
+
+External content is explicitly marked untrusted. Web research does not grant filesystem mutation or shell authority.
+
+## Conversation model
+
+The same `ExecutionEngine` backs terminal chat and ACP sessions, retaining prior user/assistant turns across repeated calls.
+
 ## Brand and theme
 
-Canonical brand assets live under:
+Canonical assets:
 
 ```text
 assets/brand/cognigenesis-logo.svg
@@ -152,19 +120,6 @@ assets/brand/theme.css
 
 See [`BRANDING.md`](BRANDING.md).
 
-## Model alignment and authority
-
-Connecting a model does not automatically grant it authority. Models receive conservative trust profiles until qualified, and capabilities require both runtime-policy approval and a sufficient trust tier.
-
-See [`ALIGNMENT.md`](ALIGNMENT.md) and [`SECURITY.md`](SECURITY.md).
-
 ## Tests
 
-CI runs on Ubuntu, macOS, and Windows across supported Python versions. It includes:
-
-- mocked Ollama HTTP response tests
-- explicit provider-selection tests
-- persistent conversation-history tests
-- ACP subprocess handshake/prompt smoke tests
-- Windows-safe Python argument-array launch path
-- optional live Ollama ACP round trip with `COGNI_TEST_OLLAMA=1`
+CI covers Ubuntu, macOS, and Windows and includes Ollama provider tests, timeout classification, provider selection, persistent conversation history, ACP subprocess handshake, Windows-safe Python launch behavior, and web research parser/policy tests.
