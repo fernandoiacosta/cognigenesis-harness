@@ -1,23 +1,40 @@
 from __future__ import annotations
 
+from cognigenesis.runtime.events import EventBus, EventType
 from cognigenesis.runtime.taskgraph import Task, TaskGraph, TaskStatus
 from core.registry import CapabilityRegistry
 from core.types import Capability
 
 
-def register_task_tools(registry: CapabilityRegistry, graph: TaskGraph) -> None:
+def register_task_tools(
+    registry: CapabilityRegistry,
+    graph: TaskGraph,
+    event_bus: EventBus | None = None,
+) -> None:
+    def emit(action: str, task: dict) -> None:
+        if event_bus:
+            event_bus.emit(
+                EventType.TASK_UPDATED,
+                {"action": action, "task": task},
+                source="task-graph",
+            )
+
     def add_task(args: dict):
         task = graph.add(Task(
             title=str(args["title"]),
             description=str(args.get("description", "")),
             dependencies=list(args.get("dependencies", [])),
         ))
-        return task.to_dict()
+        payload = task.to_dict()
+        emit("add", payload)
+        return payload
 
     def update_task(args: dict):
         status = TaskStatus(str(args["status"]))
         task = graph.update_status(args["task_id"], status, result=args.get("result"))
-        return task.to_dict()
+        payload = task.to_dict()
+        emit("update", payload)
+        return payload
 
     registry.register(Capability(
         "task.add",
