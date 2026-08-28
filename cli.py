@@ -30,14 +30,15 @@ from cognigenesis.console import (
     success_message,
     warning_message,
 )
+from cognigenesis.fabric.patterns import TeamPattern
 from core.model_profile import TrustTier
 from core.stdio import configure_utf8_stdio
-from harness import build_engine
+from harness import build_engine, build_team_runner
 from providers.base import ProviderError
 from providers.factory import provider_identity
 
 VERSION = __version__
-KNOWN_COMMANDS = {"run", "chat", "setup", "qualify", "doctor", "aionui", "config"}
+KNOWN_COMMANDS = {"run", "chat", "team", "setup", "qualify", "doctor", "aionui", "config"}
 
 
 def _provider_args(parser: argparse.ArgumentParser) -> None:
@@ -67,6 +68,16 @@ def _parser() -> argparse.ArgumentParser:
 
     chat = sub.add_parser("chat", help="Start the persistent themed chat interface")
     _provider_args(chat)
+
+    team = sub.add_parser("team", help="Run a bounded Cognigenesis multi-agent team")
+    _provider_args(team)
+    team.add_argument(
+        "--pattern",
+        choices=[pattern.value for pattern in TeamPattern],
+        default=TeamPattern.ADVERSARIAL_COUNCIL.value,
+        help="Team coordination pattern",
+    )
+    team.add_argument("objective", nargs="+", help="Mission for the team")
 
     setup = sub.add_parser("setup", help="Configure, discover, and qualify the local Ollama model")
     setup.add_argument("--model", default=None)
@@ -198,6 +209,46 @@ def _run_chat(args: argparse.Namespace) -> int:
             error_message(f"Runtime error: {exc}")
 
 
+
+def _run_team(args: argparse.Namespace) -> int:
+    workspace = _resolved_workspace(args.workspace)
+    pattern = TeamPattern(args.pattern)
+    runner, platform = build_team_runner(
+        workspace,
+        provider_name=args.provider,
+        model=args.model,
+        base_url=args.base_url,
+        timeout=args.timeout,
+    )
+    banner(VERSION)
+    status_table([
+        ("mode", "team", "cogni.violet"),
+        ("pattern", pattern.value, "cogni.cyan"),
+        ("workspace", str(workspace), ""),
+        ("model", args.model or load_settings().model or "configured/default", ""),
+    ])
+    objective = " ".join(args.objective)
+    try:
+        with console.status(f"[cogni.violet]Running {pattern.value} team…[/]", spinner="dots"):
+            result = runner.run(pattern, objective, model=args.model)
+    except ProviderError as exc:
+        error_message(str(exc))
+        return 2
+    except Exception as exc:
+        error_message(f"Team runtime error: {exc}")
+        return 1
+
+    console.print("\n[cogni.muted]Team activity[/]")
+    for run in result.runs:
+        console.print(
+            f"[cogni.violet]•[/] [bold]{run.agent_name}[/] "
+            f"[cogni.muted]{run.role}[/] → completed"
+        )
+    console.print()
+    assistant_message(result.final)
+    return 0
+
+
 def _render_checks(checks) -> int:
     rows = []
     failures = 0
@@ -314,6 +365,8 @@ def main() -> None:
 
     if args.command == "chat":
         raise SystemExit(_run_chat(args))
+    if args.command == "team":
+        raise SystemExit(_run_team(args))
     if args.command == "setup":
         raise SystemExit(_run_setup(args))
     if args.command == "qualify":
