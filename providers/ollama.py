@@ -47,7 +47,7 @@ class OllamaProvider(ModelProvider):
         req = request.Request(
             f"{self.base_url}/api/chat",
             data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json", "User-Agent": "Cognigenesis-Harness/1.0"},
+            headers={"Content-Type": "application/json", "User-Agent": "Cognigenesis-Harness/2.0a1"},
             method="POST",
         )
 
