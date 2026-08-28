@@ -73,6 +73,43 @@ Inside chat:
 
 The response renderer now uses normal Rich wrapping inside terminal-width panels; long prose should no longer disappear beyond the right edge.
 
+## Teams
+
+Run a bounded multi-agent cognition pattern over the same runtime:
+
+```powershell
+cogni team --pattern adversarial-council "Evaluate this architecture and try to falsify its assumptions"
+```
+
+Available patterns:
+
+```text
+parallel-search
+adversarial-council
+red-blue
+specialist-pipeline
+consensus
+```
+
+Each agent gets an isolated session while sharing the mission task graph, cognitive ledger, event stream, and team message fabric.
+
+## Command Center
+
+Launch the first graphical Command Center:
+
+```powershell
+cogni command-center --workspace . --open
+```
+
+Then run `cogni chat --workspace .` or `cogni team ... --workspace .` in another terminal. The dashboard polls the same atomic workspace snapshot and displays:
+
+- cognitive metrics, hypotheses, and evidence
+- task graph
+- teams and agents
+- recent semantic runtime events
+
+The current web dashboard is the first UI over the shared state contract, not a separate backend.
+
 ## AionUi / ACP
 
 The supported ACP entry point remains:
