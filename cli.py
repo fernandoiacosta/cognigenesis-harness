@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+import webbrowser
 from pathlib import Path
 
 from prompt_toolkit import PromptSession
@@ -19,6 +20,7 @@ from cognigenesis.bootstrap import (
     qualify_settings,
     run_checks,
 )
+from cognigenesis.commandcenter.server import serve_command_center
 from cognigenesis.config import config_path, history_path, load_settings
 from cognigenesis.console import (
     RuntimeIdentity,
@@ -38,7 +40,7 @@ from providers.base import ProviderError
 from providers.factory import provider_identity
 
 VERSION = __version__
-KNOWN_COMMANDS = {"run", "chat", "team", "setup", "qualify", "doctor", "aionui", "config"}
+KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "setup", "qualify", "doctor", "aionui", "config"}
 
 
 def _provider_args(parser: argparse.ArgumentParser) -> None:
@@ -78,6 +80,12 @@ def _parser() -> argparse.ArgumentParser:
         help="Team coordination pattern",
     )
     team.add_argument("objective", nargs="+", help="Mission for the team")
+
+    command_center = sub.add_parser("command-center", help="Launch the local Cognigenesis graphical Command Center")
+    command_center.add_argument("--workspace", default=None)
+    command_center.add_argument("--host", default="127.0.0.1")
+    command_center.add_argument("--port", default=8765, type=int)
+    command_center.add_argument("--open", action="store_true", dest="open_browser", help="Open the dashboard in the default browser")
 
     setup = sub.add_parser("setup", help="Configure, discover, and qualify the local Ollama model")
     setup.add_argument("--model", default=None)
@@ -208,6 +216,29 @@ def _run_chat(args: argparse.Namespace) -> int:
         except Exception as exc:
             error_message(f"Runtime error: {exc}")
 
+
+
+
+def _run_command_center(args: argparse.Namespace) -> int:
+    workspace = _resolved_workspace(args.workspace)
+    url = f"http://{args.host}:{args.port}"
+    banner(VERSION)
+    status_table([
+        ("mode", "Command Center", "cogni.magenta"),
+        ("workspace", str(workspace), ""),
+        ("url", url, "cogni.cyan"),
+    ])
+    console.print("[cogni.muted]The dashboard reads the same persisted task/cognition/team/event state produced by chat and team runs.[/]")
+    if args.open_browser:
+        webbrowser.open(url)
+    try:
+        serve_command_center(workspace, host=args.host, port=args.port)
+    except KeyboardInterrupt:
+        console.print("\n[cogni.muted]Command Center stopped.[/]")
+    except OSError as exc:
+        error_message(f"Could not start Command Center: {exc}")
+        return 1
+    return 0
 
 
 def _run_team(args: argparse.Namespace) -> int:
@@ -367,6 +398,8 @@ def main() -> None:
         raise SystemExit(_run_chat(args))
     if args.command == "team":
         raise SystemExit(_run_team(args))
+    if args.command == "command-center":
+        raise SystemExit(_run_command_center(args))
     if args.command == "setup":
         raise SystemExit(_run_setup(args))
     if args.command == "qualify":
