@@ -1,3 +1,1 @@
-"""Cognigenesis Harness product package."""
-
-__version__ = "1.0.0"
+"""Cognigenesis platform package."""\n\n__version__ = "2.0.0a1"\n
