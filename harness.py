@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from threading import Event
 
+from cognigenesis.platform import PlatformServices
 from cognigenesis.profiles import load_profile
 from core.context import ContextCompiler
 from core.engine import ExecutionEngine
@@ -28,6 +29,8 @@ def build_engine(
     model: str | None = None,
     base_url: str | None = None,
     timeout: float | None = None,
+    services: PlatformServices | None = None,
+    session_id: str | None = None,
 ) -> ExecutionEngine:
     registry = CapabilityRegistry()
     register_filesystem_tools(registry, workspace)
@@ -39,11 +42,10 @@ def build_engine(
     provider = build_provider(provider_name, model=model, base_url=base_url, timeout=timeout)
     provider_id, model_id = provider_identity(provider)
 
-    # Persisted qualification evidence can promote a model. Unknown/new model
-    # identifiers always fall back to the conservative profile.
     model_profile = load_profile(provider_id, model_id) or conservative_profile(provider_id, model_id)
     policy = Policy(workspace=workspace, model_profile=model_profile)
     compiler = ContextCompiler(workspace=workspace, registry=registry, state=state)
+    platform = services or PlatformServices.create()
 
     return ExecutionEngine(
         provider=provider,
@@ -53,6 +55,11 @@ def build_engine(
         state=state,
         max_steps=12,
         cancel_event=cancel_event,
+        event_bus=platform.events,
+        task_graph=platform.tasks,
+        cognition=platform.cognition,
+        team_manager=platform.teams,
+        session_id=session_id,
     )
 
 
