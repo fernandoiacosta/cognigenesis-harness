@@ -4,6 +4,7 @@ import argparse
 from pathlib import Path
 from threading import Event
 
+from cognigenesis.fabric.supervisor import TeamRunner
 from cognigenesis.platform import PlatformServices
 from cognigenesis.profiles import load_profile
 from core.context import ContextCompiler
@@ -20,6 +21,48 @@ from tools.shell import register_shell_tools
 from tools.tasks import register_task_tools
 from tools.web import register_web_tools
 from tools.workspace import register_workspace_tools
+
+
+def build_team_runner(
+    workspace: Path,
+    *,
+    provider_name: str | None = None,
+    model: str | None = None,
+    base_url: str | None = None,
+    timeout: float | None = None,
+) -> tuple[TeamRunner, PlatformServices]:
+    workspace = workspace.resolve()
+    workspace.mkdir(parents=True, exist_ok=True)
+    platform = PlatformServices.create()
+
+    def engine_factory(agent, team_id: str) -> ExecutionEngine:
+        state_path = (
+            workspace
+            / ".cognigenesis"
+            / "teams"
+            / team_id
+            / f"{agent.id}.json"
+        )
+        return build_engine(
+            workspace,
+            state_path=state_path,
+            provider_name=provider_name,
+            model=agent.model or model,
+            base_url=base_url,
+            timeout=timeout,
+            services=platform,
+            session_id=f"{team_id}:{agent.id}",
+        )
+
+    return (
+        TeamRunner(
+            manager=platform.teams,
+            tasks=platform.tasks,
+            events=platform.events,
+            engine_factory=engine_factory,
+        ),
+        platform,
+    )
 
 
 def build_engine(
