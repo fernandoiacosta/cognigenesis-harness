@@ -14,8 +14,10 @@ from core.registry import CapabilityRegistry
 from core.stdio import configure_utf8_stdio
 from providers.factory import build_provider, provider_identity
 from state.store import StateStore
+from tools.cognition import register_cognition_tools
 from tools.filesystem import register_filesystem_tools
 from tools.shell import register_shell_tools
+from tools.tasks import register_task_tools
 from tools.web import register_web_tools
 from tools.workspace import register_workspace_tools
 
@@ -32,11 +34,14 @@ def build_engine(
     services: PlatformServices | None = None,
     session_id: str | None = None,
 ) -> ExecutionEngine:
+    platform = services or PlatformServices.create()
     registry = CapabilityRegistry()
     register_filesystem_tools(registry, workspace)
     register_shell_tools(registry, workspace)
     register_web_tools(registry)
     register_workspace_tools(registry, workspace)
+    register_cognition_tools(registry, platform.cognition)
+    register_task_tools(registry, platform.tasks)
 
     state = StateStore(state_path or workspace / ".cognigenesis" / "state.json")
     provider = build_provider(provider_name, model=model, base_url=base_url, timeout=timeout)
@@ -44,8 +49,13 @@ def build_engine(
 
     model_profile = load_profile(provider_id, model_id) or conservative_profile(provider_id, model_id)
     policy = Policy(workspace=workspace, model_profile=model_profile)
-    compiler = ContextCompiler(workspace=workspace, registry=registry, state=state)
-    platform = services or PlatformServices.create()
+    compiler = ContextCompiler(
+        workspace=workspace,
+        registry=registry,
+        state=state,
+        cognition=platform.cognition,
+        tasks=platform.tasks,
+    )
 
     return ExecutionEngine(
         provider=provider,
