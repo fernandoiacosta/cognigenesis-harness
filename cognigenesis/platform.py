@@ -33,4 +33,5 @@ class PlatformServices:
             tasks=self.tasks,
             cognition=self.cognition,
             events=self.events,
+            teams=self.teams,
         )
