@@ -82,7 +82,7 @@ class CognigenesisAcpAgent(Agent):
         session_id = uuid4().hex
         cancel_event = Event()
         state_path = workspace / ".cognigenesis" / "sessions" / f"{session_id}.json"
-        engine = build_engine(workspace, cancel_event=cancel_event, state_path=state_path)
+        engine = build_engine(workspace, cancel_event=cancel_event, state_path=state_path, session_id=session_id)
         self._sessions[session_id] = AcpSession(workspace, engine, cancel_event, asyncio.Lock())
         return NewSessionResponse(session_id=session_id)
 
