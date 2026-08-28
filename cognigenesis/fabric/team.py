@@ -6,6 +6,7 @@ from typing import Iterable
 from uuid import uuid4
 
 from cognigenesis.fabric.messages import AgentMessage, MessageKind
+from cognigenesis.runtime.events import EventBus, EventType
 
 
 @dataclass
@@ -28,17 +29,13 @@ class Team:
 
 
 class TeamManager:
-    """Coordination substrate; execution strategy remains pluggable.
+    """Coordination substrate for teams without bloating the agent kernel."""
 
-    The manager owns team membership and typed inter-agent mailboxes. It does
-    not force every deployment into a swarm, and does not embed orchestration
-    policy inside the single-agent execution kernel.
-    """
-
-    def __init__(self) -> None:
+    def __init__(self, event_bus: EventBus | None = None) -> None:
         self._teams: dict[str, Team] = {}
         self._mailboxes: dict[str, list[AgentMessage]] = {}
         self._lock = RLock()
+        self._events = event_bus
 
     def create_team(
         self,
@@ -76,6 +73,12 @@ class TeamManager:
                 for agent_id in self._mailboxes:
                     if agent_id != message.sender:
                         self._mailboxes[agent_id].append(message)
+        if self._events:
+            self._events.emit(
+                EventType.AGENT_MESSAGE,
+                message.to_dict(),
+                source="agent-fabric",
+            )
         return message
 
     def receive(self, agent_id: str, *, clear: bool = True) -> list[AgentMessage]:
@@ -97,10 +100,16 @@ class TeamManager:
                     {
                         **asdict(agent),
                         "capabilities": sorted(agent.capabilities),
+                        "pending_messages": len(self._mailboxes.get(agent.id, [])),
                     }
                     for agent in team.agents.values()
                 ],
             }
+
+    def snapshot(self) -> list[dict]:
+        with self._lock:
+            ids = list(self._teams)
+        return [self.team_snapshot(team_id) for team_id in ids]
 
     @staticmethod
     def handoff(sender: str, recipient: str, content: str, **payload) -> AgentMessage:
