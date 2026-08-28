@@ -78,6 +78,7 @@ def build_engine(
     session_id: str | None = None,
 ) -> ExecutionEngine:
     platform = services or PlatformServices.create()
+    platform.bind_workspace(workspace)
     registry = CapabilityRegistry()
     register_filesystem_tools(registry, workspace)
     register_shell_tools(registry, workspace)
