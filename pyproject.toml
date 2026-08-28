@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cognigenesis-harness"
-version = "1.0.0"
-description = "Polished local-first Cognigenesis intelligence harness with Ollama, web research, persistent chat, trust-gated tools, themed terminal UX, and ACP stdio support for AionUi."
+version = "2.0.0a1"
+description = "Cognigenesis cognitive operating environment: local-first agent runtime, explicit cognition scaffolding, team fabric, semantic events, Ollama, TUI, and ACP/AionUi support."
 requires-python = ">=3.11,<3.15"
 dependencies = [
   "agent-client-protocol>=0.12.1,<0.13",
