@@ -20,11 +20,12 @@ class PlatformServices:
 
     @classmethod
     def create(cls) -> "PlatformServices":
+        events = EventBus()
         return cls(
-            events=EventBus(),
+            events=events,
             tasks=TaskGraph(),
             cognition=CognitiveLedger(),
-            teams=TeamManager(),
+            teams=TeamManager(events),
         )
 
     def command_center_snapshot(self) -> CommandCenterSnapshot:
