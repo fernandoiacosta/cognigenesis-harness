@@ -1,239 +1,210 @@
-# Cognigenesis Harness v1.0 Architecture
+# Cognigenesis 2.0 Architecture
 
-## Product invariant
+## Thesis
 
-> Keep the execution kernel small. Move cognition, capabilities, interfaces, providers, and growth outward while keeping authority explicit.
+Cognigenesis is the **cognition layer**. Cognigenesis Harness is the small runtime/authority boundary underneath it.
 
-Cognigenesis Harness is not intended to hard-code every AI feature into a permanent subsystem. It provides a stable runtime that can discover and use bounded capabilities.
-
-## Runtime
+The platform is no longer framed as a single-agent CLI with add-ons. It is a cognitive operating environment:
 
 ```text
-Human terminal / ACP client
-          │
-          ▼
-   Interface layer
-   ├─ cogni (Rich + prompt-toolkit)
-   └─ cogni-acp (ACP stdio)
-          │
-          ▼
-Packaged Cognitive Control Plane
-          │
-          ▼
-    Context Compiler
-          │
-          ├─ durable conversation
-          ├─ runtime state
-          └─ capability schemas
-          │
-          ▼
-      Model Provider
-        (Ollama)
-          │
-          ▼
-    Execution Kernel
-          │
-     ┌────┴────┐
-     ▼         ▼
-   Policy   Model Trust
-     └────┬────┘
-          ▼
- Capability Registry
-          │
- ┌────────┼─────────────┐
- ▼        ▼             ▼
-files   web/research   workspace
-                     shell (off by default)
+                  COGNIGENESIS
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+   Command Center      TUI             ACP/AionUi
+        │               │                │
+        └───────────────┼────────────────┘
+                        ▼
+                  Semantic Event Bus
+                        │
+        ┌───────────────┼────────────────┐
+        ▼               ▼                ▼
+    Task Graph     Cognitive Ledger    Agent Fabric
+                        │                │
+                        └───────┬────────┘
+                                ▼
+                         Execution Engine
+                                │
+                     Policy + Model Trust
+                                │
+                         Capability Registry
+                                │
+                         Model / Provider
 ```
 
-## Canonical chat/tool transcript
+## One runtime, multiple interfaces
 
-Multi-step execution preserves the standard ordering expected by chat/tool APIs:
+Terminal, ACP, and the graphical Command Center must not implement separate agent logic.
+
+The execution engine emits semantic events. Interfaces consume events and shared state.
+
+Examples:
+
+- `turn.started`
+- `model.started`
+- `tool.requested`
+- `tool.completed`
+- `policy.denied`
+- `cognition.updated`
+- `task.updated`
+- `agent.message`
+- `turn.completed`
+
+Observability subscribers are isolated: a GUI/logger failure cannot break the runtime.
+
+## Cognitive architecture
+
+Cognigenesis does not expose hidden chain-of-thought. It maintains explicit external reasoning state.
+
+The current CognitiveLedger contains:
 
 ```text
-user
-→ assistant(tool_calls)
-→ tool(result)
-→ assistant(tool_calls) ...
-→ assistant(final)
+Hypothesis
+├─ claim
+├─ mechanism
+├─ confidence
+├─ status
+└─ linked evidence
+
+Evidence
+├─ claim
+├─ source
+├─ polarity
+└─ confidence
+
+OpenQuestion
+├─ question
+├─ priority
+└─ resolved
 ```
 
-The current user message remains before all tool activity. This is important for reliable local-model reasoning across multiple tool steps.
+The model can manipulate this state through trusted `cognition.*` capabilities. The ledger is included in compiled context so later turns and team members can inspect it.
 
-## Cognitive control plane
+## Task graph
 
-Behavioral rules are Markdown. The canonical runtime copy is packaged under:
+The shared TaskGraph represents dependency-aware mission execution:
 
 ```text
-cognigenesis/resources/agent.md
+pending → ready → running → completed
+                  ├→ blocked
+                  ├→ failed
+                  └→ cancelled
 ```
 
-The repository-root `agent.md` mirrors it for review. Installed behavior therefore does not depend on the original Git checkout being present.
+The model can inspect/update it through `task.*`. Team execution also uses the same graph.
 
-Markdown can request or describe actions; it cannot grant executable authority.
+## Agent fabric
+
+Agents exchange typed objects rather than relying only on prose chat.
+
+Current message kinds:
+
+```text
+task
+finding
+hypothesis
+evidence
+question
+critique
+decision
+handoff
+status
+artifact
+```
+
+Agent messages emit `agent.message` events and appear in the Command Center state.
+
+## Team runtime
+
+The first bounded TeamRunner is synchronous and deterministic by design. Each agent receives:
+
+- its own persisted session state;
+- a role-specific prompt;
+- the shared CognitiveLedger;
+- the shared TaskGraph;
+- the same capability/policy system.
+
+Current patterns:
+
+- Parallel Search
+- Adversarial Council
+- Red Team / Blue Team
+- Specialist Pipeline
+- Consensus
+
+The swarm layer is above the single-agent kernel; it does not alter the fundamental execution loop.
+
+## Command Center
+
+Every active workspace gets:
+
+```text
+.cognigenesis/command-center.json
+```
+
+This atomic UI-neutral snapshot contains:
+
+- tasks;
+- cognition;
+- teams/agents;
+- recent runtime events.
+
+`cogni command-center` launches the first graphical surface and polls that state.
+
+The final Command Center should grow from this contract rather than inventing a second backend.
 
 ## Capability plane
-
-Capabilities are registered Python implementations with:
-
-- stable ID
-- description
-- risk classification
-- explicit JSON input schema
-- trusted execution function
 
 Current built-ins include:
 
 ```text
-filesystem.read
-filesystem.write
-filesystem.list
-workspace.create_project
+filesystem.*
+workspace.*
 web.search
 web.fetch
+cognition.*
+task.*
 shell.run
 ```
 
-The model receives the actual runtime registry and JSON schemas rather than relying on prompt claims about what might exist.
+Cognitive and task capabilities manipulate internal scaffolding. External mutation remains subject to stronger trust and policy gates.
 
 ## Authority plane
 
-Execution requires two independent gates:
+Capability is not authority.
 
 ```text
-runtime policy allows capability
-AND
-model trust tier >= capability minimum
+registered capability
+      AND
+runtime policy
+      AND
+model trust floor
+      AND
+future operator permission
+      ↓
+execution
 ```
 
-`shell.run` is registered but disabled by runtime policy by default. Read-only public-web research is available at low trust; mutation remains more restricted.
+Shell remains disabled by default.
 
 ## Provider plane
 
-Ollama is the v1 local-first provider. Resolution precedence is:
+Ollama remains the local-first provider. Providers receive:
 
-```text
-CLI flag
-→ environment variable
-→ persisted user configuration
-→ autodiscovered/default model
-```
+- actual runtime capability schemas;
+- bounded conversation history;
+- runtime state;
+- cognitive ledger;
+- task graph.
 
-First-use setup prefers:
+Provider breadth and native streaming come later without changing the core architecture.
 
-1. `hasi-edge-AG:latest`
-2. `llama3.1:8b`
-3. first installed Ollama model
+## ACP
 
-`StubProvider` is retained only for explicit tests/demo mode.
+`cogni-acp` remains a Python-native ACP-over-stdio interface over the same engine.
 
-## State plane
+The next ACP stage is to map semantic runtime events to richer ACP updates (tool progress, reasoning-status objects, permissions, and streaming) rather than returning only final text.
 
-Workspace state lives under `.cognigenesis/` and is written atomically.
+## Evolution invariant
 
-The state store tracks:
-
-- current objective
-- recent runtime events
-- artifacts/goals scaffolding
-- bounded durable conversation history
-
-Terminal chat reopens the workspace conversation after process restart. `/new` clears it.
-
-ACP sessions isolate state under:
-
-```text
-.cognigenesis/sessions/<session-id>.json
-```
-
-## Research boundary
-
-`web.search` and `web.fetch` are evidence tools, not execution-authority tools.
-
-- fetched content is explicitly untrusted
-- important claims should be verified across sources
-- `web.fetch` blocks localhost/private/non-global network targets
-- web content cannot grant shell/filesystem authority
-
-## Interface plane
-
-### Terminal
-
-`cogni` owns human interaction:
-
-- styled Prime Dark theme
-- Markdown response rendering
-- persistent input history
-- auto-suggestions
-- setup/doctor/config/AionUi commands
-- one-shot compatibility
-
-### ACP
-
-`cogni-acp` owns machine interaction:
-
-- Python-native stdio transport
-- ACP initialization/session/prompt/update/cancel flow
-- no Node/`.cmd` prompt-time wrapper
-- UTF-8-only protocol stream
-- same execution engine and provider as the terminal
-
-## Configuration
-
-There is one persistent configuration source resolved by `platformdirs`. The obsolete repository `config.yaml` was removed.
-
-```text
-CLI
-→ environment
-→ user config
-→ defaults
-```
-
-This avoids code/config drift between terminal, ACP, and installed environments.
-
-## Packaging
-
-v1 is packaged as an installable wheel/sdist. The wheel includes:
-
-- runtime packages
-- cognitive control resource
-- theme tokens
-- Cognigenesis logo
-- both console entry points
-
-CI verifies those resources from outside the repository after installing the built wheel.
-
-## Installation flow
-
-```text
-platform installer
-→ authenticated package install/upgrade
-→ executable verification
-→ PATH repair (Windows user-site fallback)
-→ cogni setup
-→ Ollama/model diagnostics
-→ exported brand assets
-→ ready terminal + AionUi configuration
-```
-
-## Evolution principle
-
-Soft evolution—Markdown rules, modes, protocols, and skills—should remain cheap, inspectable, and reversible.
-
-Hard executable extension should require a later governed pipeline:
-
-```text
-proposal
-→ static inspection
-→ sandbox
-→ tests
-→ permission analysis
-→ policy approval
-→ registration
-→ observation
-→ rollback
-```
-
-The architecture should continue following one asymmetry:
-
-> Kernel complexity grows slowly; capability space may grow rapidly; authority grows only with evidence.
+> The harness is the kernel. Cognigenesis is the cognition layer. Teams, swarms, and interfaces grow around them. Authority remains explicit.
