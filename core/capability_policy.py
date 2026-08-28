@@ -7,6 +7,8 @@ CAPABILITY_MINIMUM_TIERS: dict[str, TrustTier] = {
     "core.": TrustTier.OBSERVER,
     "web.search": TrustTier.OBSERVER,
     "web.fetch": TrustTier.OBSERVER,
+    "cognition.": TrustTier.OBSERVER,
+    "task.": TrustTier.BASIC,
     "filesystem.read": TrustTier.BASIC,
     "filesystem.list": TrustTier.BASIC,
     "filesystem.write": TrustTier.TRUSTED,
