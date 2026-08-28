@@ -20,7 +20,7 @@ class CommandCenterStore:
             **payload,
         }
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        tmp.write_text(json.dumps(document, indent=2, ensure_ascii=False), encoding="utf-8")
+        tmp.write_text(json.dumps(document, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
         os.replace(tmp, self.path)
 
     def load(self) -> dict[str, Any]:
