@@ -1,11 +1,24 @@
 from __future__ import annotations
 
 from cognigenesis.cognition.ledger import CognitiveLedger, Evidence, Hypothesis, OpenQuestion
+from cognigenesis.runtime.events import EventBus, EventType
 from core.registry import CapabilityRegistry
 from core.types import Capability
 
 
-def register_cognition_tools(registry: CapabilityRegistry, ledger: CognitiveLedger) -> None:
+def register_cognition_tools(
+    registry: CapabilityRegistry,
+    ledger: CognitiveLedger,
+    event_bus: EventBus | None = None,
+) -> None:
+    def emit(kind: str, payload: dict) -> None:
+        if event_bus:
+            event_bus.emit(
+                EventType.COGNITION_UPDATED,
+                {"kind": kind, **payload},
+                source="cognition",
+            )
+
     def add_hypothesis(args: dict):
         item = ledger.add_hypothesis(Hypothesis(
             claim=str(args["claim"]),
@@ -13,7 +26,9 @@ def register_cognition_tools(registry: CapabilityRegistry, ledger: CognitiveLedg
             confidence=float(args.get("confidence", 0.5)),
             status=str(args.get("status", "untested")),
         ))
-        return {"hypothesis": item.__dict__, "metrics": ledger.snapshot()["metrics"]}
+        payload = {"hypothesis": item.__dict__, "metrics": ledger.snapshot()["metrics"]}
+        emit("hypothesis", payload)
+        return payload
 
     def add_evidence(args: dict):
         item = ledger.add_evidence(
@@ -25,14 +40,18 @@ def register_cognition_tools(registry: CapabilityRegistry, ledger: CognitiveLedg
             ),
             hypothesis_id=args.get("hypothesis_id"),
         )
-        return {"evidence": item.__dict__, "metrics": ledger.snapshot()["metrics"]}
+        payload = {"evidence": item.__dict__, "metrics": ledger.snapshot()["metrics"]}
+        emit("evidence", payload)
+        return payload
 
     def add_question(args: dict):
         item = ledger.add_question(OpenQuestion(
             question=str(args["question"]),
             priority=int(args.get("priority", 1)),
         ))
-        return {"question": item.__dict__, "metrics": ledger.snapshot()["metrics"]}
+        payload = {"question": item.__dict__, "metrics": ledger.snapshot()["metrics"]}
+        emit("question", payload)
+        return payload
 
     registry.register(Capability(
         "cognition.hypothesis.add",
