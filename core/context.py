@@ -1,19 +1,30 @@
 from __future__ import annotations
 from pathlib import Path
 
+from cognigenesis.cognition.ledger import CognitiveLedger
 from cognigenesis.resources import text as resource_text
+from cognigenesis.runtime.taskgraph import TaskGraph
 from core.registry import CapabilityRegistry
 from state.store import StateStore
 
 
 class ContextCompiler:
-    def __init__(self, workspace: Path, registry: CapabilityRegistry, state: StateStore) -> None:
+    def __init__(
+        self,
+        workspace: Path,
+        registry: CapabilityRegistry,
+        state: StateStore,
+        *,
+        cognition: CognitiveLedger | None = None,
+        tasks: TaskGraph | None = None,
+    ) -> None:
         self.workspace = workspace
         self.registry = registry
         self.state = state
+        self.cognition = cognition
+        self.tasks = tasks
 
     def _control_plane(self) -> str:
-        # Installed packages must not depend on repository-root files being present.
         try:
             return resource_text("agent.md")
         except Exception:
@@ -27,5 +38,7 @@ class ContextCompiler:
             "objective": objective,
             "capabilities": self.registry.describe(),
             "state": self.state.snapshot(),
+            "cognition": self.cognition.snapshot() if self.cognition else {},
+            "tasks": self.tasks.snapshot() if self.tasks else [],
             "history": history[-40:],
         }
