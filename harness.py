@@ -40,8 +40,8 @@ def build_engine(
     register_shell_tools(registry, workspace)
     register_web_tools(registry)
     register_workspace_tools(registry, workspace)
-    register_cognition_tools(registry, platform.cognition)
-    register_task_tools(registry, platform.tasks)
+    register_cognition_tools(registry, platform.cognition, platform.events)
+    register_task_tools(registry, platform.tasks, platform.events)
 
     state = StateStore(state_path or workspace / ".cognigenesis" / "state.json")
     provider = build_provider(provider_name, model=model, base_url=base_url, timeout=timeout)
