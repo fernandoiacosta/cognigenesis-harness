@@ -118,6 +118,9 @@ def _chat_help() -> None:
         "  [cogni.cyan]/new[/]           Clear conversational context\n"
         "  [cogni.cyan]/state[/]         Show current runtime state\n"
         "  [cogni.cyan]/capabilities[/]  List executable capabilities\n"
+        "  [cogni.cyan]/cognition[/]     Inspect hypotheses/evidence/questions\n"
+        "  [cogni.cyan]/tasks[/]         Inspect the shared task graph\n"
+        "  [cogni.cyan]/events[/]        Inspect recent semantic runtime events\n"
         "  [cogni.cyan]/provider[/]      Show active provider/model\n"
         "  [cogni.cyan]/workspace[/]     Show active workspace\n"
         "  [cogni.cyan]/doctor[/]        Run health diagnostics\n"
@@ -165,6 +168,15 @@ def _run_chat(args: argparse.Namespace) -> int:
         if prompt == "/capabilities":
             for capability in engine.registry.describe():
                 console.print(f"[cogni.violet]•[/] [bold]{capability['id']}[/] [cogni.muted]{capability['description']}[/]")
+            continue
+        if prompt == "/cognition":
+            console.print_json(json.dumps(engine.cognition.snapshot(), ensure_ascii=False))
+            continue
+        if prompt == "/tasks":
+            console.print_json(json.dumps(engine.tasks.snapshot(), ensure_ascii=False))
+            continue
+        if prompt == "/events":
+            console.print_json(json.dumps([event.to_dict() for event in engine.events.history(limit=30)], ensure_ascii=False))
             continue
         if prompt == "/provider":
             p, m = provider_identity(engine.provider)
