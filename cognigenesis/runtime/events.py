@@ -91,7 +91,11 @@ class EventBus:
             self._history = self._history[-self._history_limit :]
             subscribers = list(self._subscribers)
         for callback in subscribers:
-            callback(event)
+            try:
+                callback(event)
+            except Exception:
+                # Observability/UI subscribers are never allowed to break execution.
+                continue
         return event
 
     def history(self, limit: int | None = None) -> list[RuntimeEvent]:
