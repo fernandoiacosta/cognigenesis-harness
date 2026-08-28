@@ -1,72 +1,99 @@
-# Roadmap
+# Cognigenesis Roadmap
 
-## v1.0 — Productized Local-First Harness
+## 2.0a1 — Cognitive Operating Environment Foundation
 
-Shipped:
+Implemented:
 
-- [x] real Ollama provider
-- [x] persistent multi-turn terminal chat
-- [x] durable conversation state across process restarts
-- [x] canonical assistant/tool transcript ordering
-- [x] strict tool JSON schemas
-- [x] read-only web research
-- [x] public-network-only `web.fetch` boundary
-- [x] trust-gated capability execution
-- [x] shell disabled by default
-- [x] Python-native ACP-over-stdio agent
-- [x] AionUi first-class custom-agent path
-- [x] Windows UTF-8 hardening
-- [x] Windows `.cmd`/spawn workaround eliminated from prompt execution
-- [x] `cogni setup`
-- [x] `cogni doctor`
-- [x] `cogni config`
-- [x] `cogni aionui`
-- [x] Prime Dark terminal theme
-- [x] packaged logo/theme/control-plane resources
-- [x] one cross-platform persisted configuration source
-- [x] verified Windows/macOS/Linux installers
-- [x] wheel/sdist packaging validation in CI
-- [x] ACP subprocess smoke tests
-- [x] state corruption recovery and atomic writes
+- [x] preserve working v1 Ollama / CLI / ACP execution paths
+- [x] semantic runtime EventBus
+- [x] explicit turn/model/tool/policy/failure events
+- [x] shared dependency-aware TaskGraph
+- [x] CognitiveLedger for hypotheses/evidence/contradictions/questions
+- [x] typed inter-agent AgentMessage protocol
+- [x] TeamManager communication substrate
+- [x] reusable swarm/team patterns
+- [x] UI-neutral CommandCenterSnapshot
+- [x] terminal cognition/task/event inspectors
+- [x] terminal response wrapping regression fix
 
-## Optional post-v1 extensions
+## 2.0a2 — Team Execution
 
-These are enhancements, not prerequisites for a workable harness:
+Next:
 
-### Provider breadth
+- [ ] supervisor runtime operating over TaskGraph
+- [ ] bounded agent workers sharing one mission state
+- [ ] role/model assignment
+- [ ] message delivery through runtime events
+- [ ] explicit handoff lifecycle
+- [ ] team cancellation and failure containment
+- [ ] team-level evidence/cognitive ledger merge
+- [ ] deterministic team integration tests
 
-- OpenAI provider adapter
-- Anthropic provider adapter
-- additional local providers
-- provider-native streaming/cancellation
+## 2.0a3 — Dynamic Swarm
 
-### Research breadth
+- [ ] dynamic role generation from mission requirements
+- [ ] Parallel Search executor
+- [ ] Adversarial Council executor
+- [ ] Red/Blue executor
+- [ ] Specialist Pipeline executor
+- [ ] Consensus executor
+- [ ] bounded recursive delegation
+- [ ] agent/model performance profiles for routing
 
-- pluggable search backends (Brave/Tavily/Serper/etc.)
-- source ranking/provenance ledger
-- structured citation objects
+## 2.0a4 — Full-screen TUI
 
-### ACP breadth
+- [ ] replace chat-loop presentation with application layout
+- [ ] conversation viewport with reliable resize/wrap
+- [ ] live tool/event cards
+- [ ] task graph panel
+- [ ] cognition panel
+- [ ] team/activity panel
+- [ ] permissions/approval dialogs
+- [ ] session selector/resume
+- [ ] multiline composer and attachments
+- [ ] streamed model output
 
-- session resume/load if AionUi requires it
-- interactive ACP permission requests
-- incremental streaming ACP updates
+## 2.0a5 — Command Center GUI
 
-### Qualified model promotion
+- [ ] local web/desktop Command Center
+- [ ] mission dashboard
+- [ ] agent/team graph
+- [ ] communication graph
+- [ ] cognition graph
+- [ ] task board
+- [ ] evidence ledger
+- [ ] artifacts
+- [ ] runtime trace
+- [ ] permissions
+- [ ] model/provider health
 
-- provider/model-version-specific evaluation runners
-- persisted qualification evidence
-- adversarial tool-use qualification
-- automatic trust downgrade on regression
+The GUI consumes the same CommandCenterSnapshot/event stream as the TUI and ACP.
 
-### Governed extension system
+## 2.0a6 — Protocol and Capability Fabric
 
-- extension proposals
-- static validation
-- sandbox tests
-- permission analysis
-- promotion/rollback
+- [ ] MCP client/tool registry integration
+- [ ] hierarchical AGENTS.md/project instructions
+- [ ] progressive skill discovery/loading
+- [ ] patch/diff editing capability
+- [ ] sandbox abstraction
+- [ ] interactive permission modes
+- [ ] provider capability negotiation
+- [ ] additional providers
 
-## Non-negotiable architectural constraint
+## Long-term cognition development
 
-> Kernel complexity should grow slowly. Capability space may grow rapidly. Authority grows only with evidence.
+- causal model objects
+- competing-model comparison
+- representation selection
+- null-model generation
+- contradiction tracking
+- falsification planning
+- experiment design
+- invariant discovery
+- calibrated confidence updates
+- cognitive operator performance measurement
+- self-improving team structures
+
+## Non-negotiable invariant
+
+> The harness remains a small authority boundary. Cognition, teams, swarm behavior, and interfaces grow around it rather than being embedded into one monolithic loop.
