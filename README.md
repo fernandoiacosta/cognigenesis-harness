@@ -1,162 +1,152 @@
-# Cognigenesis Harness
+# Cognigenesis
 
 ![Cognigenesis logo](assets/brand/cognigenesis-logo.svg)
 
-**Local-first adaptive intelligence runtime for Ollama, terminal chat, web research, trusted tools, and first-class ACP/AionUi integration.**
+**Cognitive operating environment for models, agents, teams, tools, and reasoning scaffolding.**
 
-Cognigenesis Harness v1.0 is designed as a product rather than a collection of wrappers: one configuration source, one execution kernel, one capability registry, one persistent conversation model, and two supported interfaces—`cogni` for humans and `cogni-acp` for ACP clients.
+Cognigenesis is the cognitive architecture. **Cognigenesis Harness** is the runtime substrate underneath it.
 
-## Quick start
+The project has entered the **2.0 alpha architecture**: the working v1 terminal/Ollama/ACP paths remain intact while the platform gains semantic events, explicit cognitive state, a shared task graph, typed agent-to-agent communication, and team/swarm primitives.
 
-### Windows PowerShell
+## What changed in 2.0a1
+
+The platform now contains four explicit layers:
+
+```text
+Command Center / Terminal / ACP
+             │
+             ▼
+      Agent Fabric / Teams
+             │
+             ▼
+      Cognitive Architecture
+             │
+             ▼
+        Harness Runtime
+             │
+             ▼
+        Model Substrate
+```
+
+New live runtime primitives include:
+
+- semantic `EventBus` for turns, models, tools, policy decisions, failures, and completion
+- shared dependency-aware `TaskGraph`
+- inspectable `CognitiveLedger` for hypotheses, evidence, contradictions, confidence, and open questions
+- typed `AgentMessage` protocol for findings, hypotheses, critiques, decisions, handoffs, and artifacts
+- `TeamManager` plus reusable Parallel Search, Adversarial Council, Red/Blue, Specialist Pipeline, and Consensus patterns
+- UI-neutral `CommandCenterSnapshot` for the future graphical dashboard and full-screen TUI
+
+The existing execution engine now emits those semantic events directly.
+
+## Terminal
+
+Install/upgrade from the private repo:
 
 ```powershell
-$script = gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.ps1 -H "Accept: application/vnd.github.raw+json"; Invoke-Expression ($script -join "`n")
+python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
 ```
-
-### macOS / Linux
-
-```bash
-gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.sh -H "Accept: application/vnd.github.raw+json" | sh
-```
-
-The installer upgrades/reinstalls the package, verifies `cogni` and `cogni-acp`, repairs the Windows user PATH when a user-site install needs it, exports the brand assets, and runs first-use setup.
 
 Then:
 
 ```text
+cogni setup
+cogni doctor
 cogni chat
 ```
 
-## Terminal experience
-
-`cogni chat` is a persistent themed conversation interface with Markdown rendering, command history, auto-suggestions, runtime status, and durable workspace conversation state.
+Inside chat:
 
 ```text
-cogni chat --workspace .
+/help
+/new
+/state
+/capabilities
+/cognition
+/tasks
+/events
+/provider
+/workspace
+/doctor
+/exit
 ```
 
-Useful commands:
-
-```text
-/help          commands
-/new           clear this workspace conversation
-/state         runtime state
-/capabilities  registered capabilities
-/provider      active provider/model
-/workspace     active workspace
-/doctor        health diagnostics
-/exit          exit
-```
-
-One-shot compatibility remains:
-
-```text
-cogni "Research current agent harnesses and compare them"
-cogni run --model hasi-edge-AG:latest "Say OK"
-```
-
-## First-use setup and diagnostics
-
-```text
-cogni setup
-cogni doctor
-cogni config
-```
-
-`setup` discovers local Ollama models and prefers `hasi-edge-AG:latest`, then `llama3.1:8b`, then the first installed model. Configuration is persisted in the OS-standard user config directory and may be overridden by CLI flags or environment variables.
-
-Supported environment overrides:
-
-```text
-COGNI_PROVIDER=ollama
-COGNI_OLLAMA_BASE_URL=http://127.0.0.1:11434
-COGNI_OLLAMA_MODEL=hasi-edge-AG:latest
-COGNI_OLLAMA_TIMEOUT=300
-```
-
-If Ollama is unavailable or a model is missing, Cognigenesis returns a specific actionable error rather than a generic upstream failure.
+The response renderer now uses normal Rich wrapping inside terminal-width panels; long prose should no longer disappear beyond the right edge.
 
 ## AionUi / ACP
 
-Cognigenesis ships a Python-native ACP-over-stdio process:
+The supported ACP entry point remains:
 
 ```text
 cogni-acp
 ```
 
-Generate the exact local AionUi settings with:
+Generate the exact machine-specific configuration with:
 
 ```text
 cogni aionui
 ```
 
-The command prints the absolute installed `cogni-acp` path, environment variables, and the exported Cognigenesis logo path. The ACP bridge never needs the old Node/`.cmd` wrapper workaround.
+ACP and the terminal share the same execution engine. v2 runtime events are designed so ACP, the future TUI, tracing, and the graphical Command Center consume the same state rather than maintaining parallel implementations.
 
 See [AIONUI.md](AIONUI.md).
 
-## Runtime architecture
+## Cognitive architecture
+
+Cognigenesis does **not** claim to expose hidden model chain-of-thought. It externalizes observable reasoning scaffolding:
 
 ```text
-user / AionUi
-      │
-      ▼
-terminal UI / ACP stdio
-      │
-      ▼
-Cognitive Control Plane (packaged)
-      │
-      ▼
-Context Compiler + durable conversation
-      │
-      ▼
-Provider (Ollama by default)
-      │
-      ▼
-Execution Kernel
-      │
-      ├── policy gate
-      ├── model-trust gate
-      └── capability registry
-              │
-              ├── filesystem.*
-              ├── workspace.*
-              ├── web.search / web.fetch
-              └── shell.run (registered, disabled by default)
+observation
+   ↓
+candidate hypotheses
+   ↓
+mechanisms
+   ↓
+evidence / contradictions
+   ↓
+verification
+   ↓
+confidence update
+   ↓
+decision / action
 ```
 
-The model sees explicit JSON schemas for tools. Multi-step execution preserves the canonical `user → assistant(tool_calls) → tool(result) → assistant` transcript expected by chat/tool APIs.
+The goal is to make cognition increasingly architecture-enforced rather than relying only on system-prompt instructions.
 
-## Research
+## Teams and swarm
 
-`web.search` and `web.fetch` are read-only. Retrieved content is labeled untrusted, and `web.fetch` rejects localhost, private, reserved, and other non-public network addresses to prevent the research tool from becoming an SSRF path.
+The harness remains a small per-agent runtime. Team coordination lives above it.
 
-## State and conversation continuity
-
-Conversation history is persisted per workspace using atomic writes under `.cognigenesis/`. Closing and reopening `cogni chat --workspace .` restores the bounded recent conversation. `/new` clears it.
-
-ACP sessions use isolated state files under:
+Typed inter-agent objects currently include:
 
 ```text
-<workspace>/.cognigenesis/sessions/<session-id>.json
+Task
+Finding
+Hypothesis
+Evidence
+Question
+Critique
+Decision
+Handoff
+Status
+Artifact
 ```
 
-## Brand and theme
+This is the foundation for a Command Center that can visualize not only which agent is active, but **what cognitive work is moving between agents**.
 
-Canonical repository assets:
+## Current model/provider path
 
-```text
-assets/brand/cognigenesis-logo.svg
-assets/brand/theme.json
-assets/brand/theme.css
-```
+Ollama remains the local-first provider. Model qualification and trust gating remain active; mutation authority is separate from both model capability and user/operator permission.
 
-Installed copies are exported by `cogni setup` to the OS user data directory so external clients can use them without locating the Git checkout.
+## Architecture and roadmap
 
-See [BRANDING.md](BRANDING.md).
+- [Cognigenesis Platform](docs/COGNIGENESIS_PLATFORM.md)
+- [Architecture](ARCHITECTURE.md)
+- [Roadmap](ROADMAP.md)
+- [Security](SECURITY.md)
+- [Installation](INSTALL.md)
+- [Branding](BRANDING.md)
 
-## Installation quality gate
+## Architectural invariant
 
-CI runs on Windows, macOS, and Ubuntu across Python 3.11–3.14. It executes the test suite, builds a real wheel/sdist, installs the built wheel, verifies packaged cognitive/theme resources outside the repository, checks both executables, validates AionUi configuration output, runs ACP subprocess smoke tests, and syntax-checks the platform installers.
-
-See [INSTALL.md](INSTALL.md), [SECURITY.md](SECURITY.md), and [ARCHITECTURE.md](ARCHITECTURE.md).
+> The harness is the kernel. Cognigenesis is the cognition layer. Teams, swarm orchestration, and the Command Center grow above them without turning the kernel into a monolith.
