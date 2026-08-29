@@ -32,6 +32,7 @@ from acp.schema import (
     TextContentBlock,
 )
 
+from cognigenesis.platform import PlatformServices
 from core.engine import ExecutionEngine
 from core.stdio import configure_utf8_stdio
 from harness import build_engine
@@ -70,6 +71,7 @@ class CognigenesisAcpAgent(Agent):
 
     def __init__(self) -> None:
         self._sessions: dict[str, AcpSession] = {}
+        self._platforms: dict[Path, PlatformServices] = {}
 
     def on_connect(self, conn: Client) -> None:
         self._conn = conn
@@ -98,7 +100,14 @@ class CognigenesisAcpAgent(Agent):
             raise ValueError(f"ACP session cwd is not a directory: {workspace}")
         cancel_event = Event()
         state_path = workspace / ".cognigenesis" / "sessions" / f"{session_id}.json"
-        engine = build_engine(workspace, cancel_event=cancel_event, state_path=state_path, session_id=session_id)
+        platform = self._platforms.setdefault(workspace, PlatformServices.create())
+        engine = build_engine(
+            workspace,
+            cancel_event=cancel_event,
+            state_path=state_path,
+            session_id=session_id,
+            services=platform,
+        )
         return AcpSession(workspace, engine, cancel_event, asyncio.Lock())
 
     async def prompt(self, session_id: str, prompt: list[TextContentBlock | ImageContentBlock | AudioContentBlock | ResourceContentBlock | EmbeddedResourceContentBlock], **kwargs: Any) -> PromptResponse:
