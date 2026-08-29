@@ -1,1 +1,3 @@
-"""Cognigenesis platform package."""\n\n__version__ = "2.0.0a1"\n
+"""Cognigenesis platform package."""
+
+__version__ = "2.0.0a1"

@@ -18,12 +18,14 @@ from acp import (
 )
 from acp.interfaces import Client
 from acp.schema import (
+    AgentCapabilities,
     AudioContentBlock,
     ClientCapabilities,
     EmbeddedResourceContentBlock,
     HttpMcpServer,
     ImageContentBlock,
     Implementation,
+    LoadSessionResponse,
     McpServerStdio,
     ResourceContentBlock,
     SseMcpServer,
@@ -44,6 +46,7 @@ class AcpSession:
     engine: ExecutionEngine
     cancel_event: Event
     prompt_lock: asyncio.Lock
+    turns: list[tuple[str, str]]
 
 
 def extract_text(blocks: list[Any]) -> str:
@@ -60,6 +63,23 @@ def extract_text(blocks: list[Any]) -> str:
     return "\n".join(part for part in parts if part).strip()
 
 
+def objective_with_continuity(objective: str, turns: list[tuple[str, str]]) -> str:
+    if not turns:
+        return objective
+    recent_turns = turns[-12:]
+    rendered = "\n\n".join(
+        f"Turn {index}:\nUser: {user}\nAssistant: {assistant}"
+        for index, (user, assistant) in enumerate(recent_turns, 1)
+    )
+    return (
+        "Conversation continuity from this ACP session:\n"
+        f"{rendered}\n\n"
+        "Use the continuity above to answer the current user message consistently.\n\n"
+        "User message:\n"
+        f"{objective}"
+    )
+
+
 class CognigenesisAcpAgent(Agent):
     """Python-native ACP-over-stdio adapter. No Node/.cmd subprocess hop is used."""
 
@@ -72,19 +92,31 @@ class CognigenesisAcpAgent(Agent):
         self._conn = conn
 
     async def initialize(self, protocol_version: int, client_capabilities: ClientCapabilities | None = None, client_info: Implementation | None = None, **kwargs: Any) -> InitializeResponse:
-        return InitializeResponse(protocol_version=protocol_version)
+        return InitializeResponse(
+            protocol_version=protocol_version,
+            agent_capabilities=AgentCapabilities(load_session=True),
+        )
 
     async def new_session(self, cwd: str, additional_directories: list[str] | None = None, mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None, **kwargs: Any) -> NewSessionResponse:
+        _ = additional_directories, mcp_servers
+        session_id = uuid4().hex
+        self._sessions[session_id] = self._build_session(cwd, session_id)
+        return NewSessionResponse(session_id=session_id)
+
+    async def load_session(self, cwd: str, session_id: str, mcp_servers: list[HttpMcpServer | SseMcpServer | McpServerStdio] | None = None, additional_directories: list[str] | None = None, **kwargs: Any) -> LoadSessionResponse:
+        _ = additional_directories, mcp_servers
+        if session_id not in self._sessions:
+            self._sessions[session_id] = self._build_session(cwd, session_id)
+        return LoadSessionResponse()
+
+    def _build_session(self, cwd: str, session_id: str) -> AcpSession:
         workspace = Path(cwd).expanduser().resolve()
         if not workspace.is_dir():
             raise ValueError(f"ACP session cwd is not a directory: {workspace}")
-        _ = additional_directories, mcp_servers
-        session_id = uuid4().hex
         cancel_event = Event()
         state_path = workspace / ".cognigenesis" / "sessions" / f"{session_id}.json"
         engine = build_engine(workspace, cancel_event=cancel_event, state_path=state_path, session_id=session_id)
-        self._sessions[session_id] = AcpSession(workspace, engine, cancel_event, asyncio.Lock())
-        return NewSessionResponse(session_id=session_id)
+        return AcpSession(workspace, engine, cancel_event, asyncio.Lock(), [])
 
     async def prompt(self, session_id: str, prompt: list[TextContentBlock | ImageContentBlock | AudioContentBlock | ResourceContentBlock | EmbeddedResourceContentBlock], **kwargs: Any) -> PromptResponse:
         session = self._sessions.get(session_id)
@@ -98,7 +130,7 @@ class CognigenesisAcpAgent(Agent):
         async with session.prompt_lock:
             session.cancel_event.clear()
             try:
-                result = await asyncio.to_thread(session.engine.run, objective)
+                result = await asyncio.to_thread(session.engine.run, objective_with_continuity(objective, session.turns))
             except ProviderError as exc:
                 await self._send_text(session_id, f"Provider error: {exc}")
                 return PromptResponse(stop_reason="end_turn")
@@ -106,6 +138,8 @@ class CognigenesisAcpAgent(Agent):
                 await self._send_text(session_id, f"Runtime error: {type(exc).__name__}: {exc}")
                 return PromptResponse(stop_reason="end_turn")
             cancelled = session.cancel_event.is_set()
+            session.turns.append((objective, result))
+            session.turns = session.turns[-20:]
             await self._send_text(session_id, result)
             return PromptResponse(stop_reason="cancelled" if cancelled else "end_turn")
 

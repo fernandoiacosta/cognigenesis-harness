@@ -10,7 +10,7 @@ from providers.base import ModelProvider, ProviderError
 
 DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434"
 DEFAULT_OLLAMA_MODEL = "llama3.1:8b"
-DEFAULT_OLLAMA_TIMEOUT = 300.0
+DEFAULT_OLLAMA_TIMEOUT = 60.0
 PREFERRED_MODELS = ("hasi-edge-AG:latest", "llama3.1:8b")
 
 

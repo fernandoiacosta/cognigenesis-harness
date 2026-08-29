@@ -61,8 +61,8 @@ def assistant_message(text: str) -> None:
     renderable = Markdown(text, justify=None)
     panel = Panel(
         renderable,
-        title="[cogni.cyan]Cognigenesis[/]",
-        border_style="cogni.cyan",
+        title="[cyan]Cognigenesis[/]",
+        border_style="cyan",
         padding=(1, 2),
         expand=True,
     )

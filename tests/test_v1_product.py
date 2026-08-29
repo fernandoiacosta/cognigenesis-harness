@@ -9,9 +9,9 @@ from cli import _normalize_argv
 
 
 def test_v1_version_and_packaged_control_plane():
-    assert __version__ == "1.0.0"
+    assert __version__ == "2.0.0a1"
     control = resource_text("agent.md")
-    assert "Cognigenesis Harness Agent" in control
+    assert "Cognigenesis Cognitive Agent" in control
     assert "Completion Principle" in control
 
 
@@ -36,8 +36,9 @@ def test_engine_exposes_strict_tool_schemas(tmp_path: Path):
     assert capabilities["workspace.create_project"]["parameters"]["required"] == ["name"]
 
 
-def test_aionui_configuration_uses_packaged_acp(monkeypatch):
+def test_aionui_configuration_uses_packaged_acp(tmp_path, monkeypatch):
     monkeypatch.setattr("cognigenesis.bootstrap.shutil.which", lambda name: r"C:\Tools\cogni-acp.exe" if name == "cogni-acp" else None)
+    monkeypatch.setattr("cognigenesis.bootstrap.data_dir", lambda: tmp_path)
     cfg = aionui_configuration()
     assert cfg["command"].endswith("cogni-acp.exe")
     assert cfg["arguments"] == []
