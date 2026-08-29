@@ -111,3 +111,31 @@ def test_acp_load_session_recovers_persisted_history_without_duplication(tmp_pat
         assert final_users == ["Remember blue-17", "Continue"]
 
     asyncio.run(run())
+
+
+def test_acp_sessions_share_workspace_platform_but_not_conversation(tmp_path, monkeypatch):
+    async def run() -> None:
+        monkeypatch.setenv("COGNI_PROVIDER", "stub")
+        agent = CognigenesisAcpAgent()
+        agent.on_connect(FakeClient())  # type: ignore[arg-type]
+
+        one = await agent.new_session(str(tmp_path))
+        two = await agent.new_session(str(tmp_path))
+
+        first = agent._sessions[one.session_id].engine
+        second = agent._sessions[two.session_id].engine
+
+        assert first.events is second.events
+        assert first.cognition is second.cognition
+        assert first.tasks is second.tasks
+        assert first.conversation_history() == []
+        assert second.conversation_history() == []
+
+        await agent.prompt(
+            one.session_id,
+            [{"type": "text", "text": "session one"}],  # type: ignore[list-item]
+        )
+        assert first.conversation_history()
+        assert second.conversation_history() == []
+
+    asyncio.run(run())
