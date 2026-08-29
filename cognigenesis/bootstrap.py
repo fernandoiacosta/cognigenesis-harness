@@ -99,12 +99,24 @@ def run_checks(settings: Settings | None = None) -> list[Check]:
             checks.append(Check("Qualification", False, f"no saved profile for {selected}", "cogni qualify"))
 
     legacy = detect_legacy_aionui_bridge()
-    checks.append(Check(
-        "AionUi bridge",
-        legacy is None,
-        "packaged cogni-acp path" if legacy is None else f"legacy bridge detected: {legacy}",
-        None if legacy is None else "Set AionUi Custom Agent command to cogni-acp with no arguments; then create a new conversation.",
-    ))
+    packaged_acp = shutil.which("cogni-acp")
+    if packaged_acp:
+        detail = f"packaged ACP: {packaged_acp}"
+        if legacy:
+            detail += f" (unused legacy file still present: {legacy})"
+        checks.append(Check(
+            "AionUi bridge",
+            True,
+            detail,
+            None,
+        ))
+    else:
+        checks.append(Check(
+            "AionUi bridge",
+            False,
+            "packaged cogni-acp executable is not available on PATH",
+            "Reinstall Cognigenesis, then set the AionUi Custom Agent command to the absolute cogni-acp executable path.",
+        ))
 
     assets = install_brand_assets()
     checks.append(Check("Brand assets", assets["logo"].exists() and assets["theme"].exists(), str(assets["logo"])))
