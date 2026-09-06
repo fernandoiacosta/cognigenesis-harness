@@ -12,7 +12,7 @@ from platformdirs import user_config_dir, user_data_dir
 APP_NAME = "Cognigenesis"
 APP_AUTHOR = "JajaLabs"
 DEFAULT_BASE_URL = "http://127.0.0.1:11434"
-DEFAULT_TIMEOUT = 300.0
+DEFAULT_TIMEOUT = 60.0
 
 
 @dataclass
