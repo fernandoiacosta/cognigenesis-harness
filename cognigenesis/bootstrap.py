@@ -36,8 +36,12 @@ def install_brand_assets() -> dict[str, Path]:
     brand_dir = data_dir() / "brand"
     brand_dir.mkdir(parents=True, exist_ok=True)
     outputs = {"logo": brand_dir / "cognigenesis-logo.svg", "theme": brand_dir / "theme.json"}
-    outputs["logo"].write_text(resource_text("cognigenesis-logo.svg"), encoding="utf-8")
-    outputs["theme"].write_text(resource_text("theme.json"), encoding="utf-8")
+    for name, resource in (("logo", "cognigenesis-logo.svg"), ("theme", "theme.json")):
+        try:
+            outputs[name].write_text(resource_text(resource), encoding="utf-8")
+        except PermissionError:
+            if not outputs[name].exists():
+                raise
     return outputs
 
 
