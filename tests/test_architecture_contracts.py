@@ -4,9 +4,9 @@ from providers.ollama import DEFAULT_OLLAMA_TIMEOUT
 
 
 def test_timeout_defaults_have_one_policy():
-    assert DEFAULT_TIMEOUT == 300.0
-    assert DEFAULT_OLLAMA_TIMEOUT == 300.0
-    assert Settings().ollama_timeout == 300.0
+    assert DEFAULT_TIMEOUT == 60.0
+    assert DEFAULT_OLLAMA_TIMEOUT == 60.0
+    assert Settings().ollama_timeout == 60.0
 
 
 def test_engine_owns_conversation_continuity(tmp_path):
