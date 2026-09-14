@@ -150,6 +150,10 @@ decision / action
 
 The goal is to make cognition increasingly architecture-enforced rather than relying only on system-prompt instructions.
 
+## Validation
+
+Controlled evaluation now begins with [Experiment 001](experiments/001/README.md), a pre-registered same-model comparison of the current Cognigenesis control plane against a minimal baseline. The fixed corpus, raw-output runner, deterministic scorer, thresholds, limitations, and integrity rules are committed before the first run. No performance claim should be made until the saved run returns `WIN`, `TIE`, `LOSS`, or `INVALID`.
+
 ## Teams and swarm
 
 The harness remains a small per-agent runtime. Team coordination lives above it.
