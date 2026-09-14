@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -29,6 +30,11 @@ def git_commit() -> str | None:
     except Exception:
         return None
 
+def installed_models(base_url: str, timeout: float) -> list[dict]:
+    req = request.Request(base_url.rstrip("/") + "/api/tags", headers={"User-Agent": "Cognigenesis-Experiment/001"})
+    with request.urlopen(req, timeout=min(timeout, 10.0)) as response:
+        return list(json.loads(response.read().decode("utf-8")).get("models", []))
+
 def call_ollama(base_url: str, model: str, system: str, prompt: str, temperature: float, seed: int, timeout: float) -> tuple[str, float]:
     payload = {
         "model": model,
@@ -36,7 +42,7 @@ def call_ollama(base_url: str, model: str, system: str, prompt: str, temperature
         "messages": [{"role": "system", "content": system + "\n\n" + EVAL_INSTRUCTION}, {"role": "user", "content": prompt}],
         "options": {"temperature": temperature, "seed": seed, "num_predict": 700},
     }
-    req = request.Request(base_url.rstrip("/") + "/api/chat", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json"}, method="POST")
+    req = request.Request(base_url.rstrip("/") + "/api/chat", data=json.dumps(payload).encode(), headers={"Content-Type": "application/json", "User-Agent": "Cognigenesis-Experiment/001"}, method="POST")
     started = time.perf_counter()
     with request.urlopen(req, timeout=timeout) as response:
         body = json.loads(response.read().decode("utf-8"))
@@ -50,6 +56,11 @@ def main() -> None:
     parser.add_argument("--temperature", type=float, default=0.2)
     parser.add_argument("--timeout", type=float, default=300)
     args = parser.parse_args()
+    models = installed_models(args.base_url, args.timeout)
+    names = {str(item.get("name")) for item in models} | {str(item.get("model")) for item in models}
+    if args.model not in names:
+        raise SystemExit(f"Model {args.model!r} is not installed. Available: {', '.join(sorted(x for x in names if x)) or 'none'}")
+    model_info = next((item for item in models if args.model in {str(item.get("name")), str(item.get("model"))}), {})
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     out = HERE / "results" / stamp
     out.mkdir(parents=True, exist_ok=False)
@@ -60,9 +71,9 @@ def main() -> None:
     manifest = {
         "experiment": "001", "status": "running", "started_at": datetime.now(timezone.utc).isoformat(),
         "git_commit": git_commit(), "dataset_sha256": hashlib.sha256(dataset_bytes).hexdigest(),
-        "model": args.model, "base_url": args.base_url, "temperature": args.temperature,
-        "timeout_seconds": args.timeout, "seeds": seeds, "evaluation_instruction": EVAL_INSTRUCTION,
-        "systems": systems, "records": [],
+        "model": args.model, "model_digest": model_info.get("digest"), "base_url": args.base_url,
+        "temperature": args.temperature, "timeout_seconds": args.timeout, "seeds": seeds,
+        "evaluation_instruction": EVAL_INSTRUCTION, "systems": systems, "records": [],
     }
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
     for case in load_cases():
@@ -79,6 +90,7 @@ def main() -> None:
     manifest["status"] = "complete"
     manifest["completed_at"] = datetime.now(timezone.utc).isoformat()
     (out / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    subprocess.run([sys.executable, str(HERE / "score.py"), str(out)], check=True)
     print(out)
 
 if __name__ == "__main__":
