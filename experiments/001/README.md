@@ -52,9 +52,16 @@ Known threats: task leakage, benchmark overfitting, format sensitivity, stochast
 
 ## Run
 
+From the repository root on Windows, the launcher selects the preferred installed model and runs plus scores the full experiment:
+
+```powershell
+.\\experiments\\001\\run.ps1
+```
+
+Or select an exact model manually:
+
 ```powershell
 python experiments/001/run.py --model llama3.1:8b --runs 3
-python experiments/001/score.py experiments/001/results/<run-directory>
 ```
 
 Optional endpoint/settings:
