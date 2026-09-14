@@ -46,27 +46,28 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("result_directory", type=Path)
     args = parser.parse_args()
-    manifest_path = args.result_directory / "manifest.json"
-    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    manifest = json.loads((args.result_directory / "manifest.json").read_text(encoding="utf-8"))
     cases = {c["id"]: c for c in [json.loads(line) for line in (HERE / "cases.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]}
     grouped: dict[str, list[float]] = defaultdict(list)
     diagnostics: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
     scored = []
     for record in manifest["records"]:
         result = score(cases[record["case_id"]], record.get("raw_response", "")) if not record.get("error") else {"total": 0.0, "parts": {}, "parsed": None}
-        enriched = {**record, "score": result}
-        scored.append(enriched)
+        scored.append({**record, "score": result})
         grouped[record["condition"]].append(result["total"])
         for name, value in result["parts"].items():
             diagnostics[record["condition"]][name].append(value)
     means = {k: round(sum(v) / len(v), 3) if v else 0.0 for k, v in grouped.items()}
     delta = round(means.get("cognigenesis", 0.0) - means.get("baseline", 0.0), 3)
-    outcome = "WIN" if delta >= 15 else ("LOSS" if delta < -5 else "TIE")
+    errors = sum(bool(r.get("error")) for r in scored)
+    expected = len(cases) * len(manifest.get("seeds", [])) * 2
+    invalid = manifest.get("status") != "complete" or len(scored) != expected or errors > 0
+    outcome = "INVALID" if invalid else ("WIN" if delta >= 15 else ("LOSS" if delta < -5 else "TIE"))
     report = {
         "experiment": "001", "outcome": outcome, "primary_score_means": means,
         "treatment_minus_baseline": delta,
         "diagnostic_means": {condition: {name: round(sum(values) / len(values), 3) for name, values in metrics.items()} for condition, metrics in diagnostics.items()},
-        "completed_records": len(scored), "errors": sum(bool(r.get("error")) for r in scored),
+        "expected_records": expected, "completed_records": len(scored), "errors": errors,
     }
     (args.result_directory / "scored.json").write_text(json.dumps(scored, indent=2) + "\n", encoding="utf-8")
     (args.result_directory / "report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
