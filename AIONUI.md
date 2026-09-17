@@ -1,6 +1,6 @@
-# AionUi Integration — Cognigenesis Harness v1.0
+# AionUi Integration — Cognigenesis Harness 2.0 alpha
 
-Cognigenesis is a Python-native ACP-over-stdio agent. The supported AionUi path is the packaged `cogni-acp` executable—no local bridge script, Node wrapper, or `.cmd` spawn is required.
+Cognigenesis Harness `2.0.0a1` is a Python-native ACP-over-stdio agent. The supported AionUi path remains the packaged `cogni-acp` executable—no local bridge script, Node wrapper, or `.cmd` spawn is required.
 
 ## 1. Install and configure Cognigenesis
 
@@ -66,7 +66,7 @@ If any traceback contains:
 %APPDATA%\AionUi\cognigenesis\cognigenesis_ollama.py
 ```
 
-that conversation is still using the old workaround instead of v1 `cogni-acp`.
+that conversation is still using the old workaround instead of the packaged `cogni-acp` entry point.
 
 Fix the Custom Agent command to the absolute path printed by:
 
@@ -120,7 +120,7 @@ user
 
 ## 7. Windows hardening
 
-v1 specifically avoids the failure modes observed during development:
+The packaged ACP path avoids the failure modes observed during development:
 
 - no Node `.cmd` wrapper during `session/prompt` → avoids `spawn EINVAL`
 - UTF-8 stdio → avoids `cp1252`/emoji crashes

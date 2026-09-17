@@ -1,6 +1,8 @@
-# Install Cognigenesis Harness v1.0
+# Install Cognigenesis Harness 2.0 alpha
 
 Supported: Windows, macOS, Linux; Python 3.11–3.14.
+
+Current package version: `2.0.0a1`. The 2.0 alpha keeps the existing terminal, Ollama, and ACP/AionUi paths while adding the Cognigenesis team, event, task, cognition, and Command Center architecture.
 
 The repository is private, so the installer must run under a GitHub-authenticated account with repository access. `gh auth setup-git` is used automatically when GitHub CLI is available.
 
