@@ -1,9 +1,9 @@
-$ErrorActionPreference = "Stop"
-
 param(
     [Parameter(Mandatory=$true)]
     [string]$PrimeFile
 )
+
+$ErrorActionPreference = "Stop"
 
 $models = @(ollama list | Select-Object -Skip 1 | ForEach-Object {
     $name = ($_ -split "\s+")[0]
