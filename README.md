@@ -194,7 +194,7 @@ Ollama remains the local-first provider. Model qualification and trust gating re
 
 ## Provider setup
 
-Install on macOS, Linux, or Android Termux (review the installer before piping it to a shell):
+Install on macOS, Linux, or Android Termux after the reviewed release is merged (review the installer before piping it to a shell). The planned short URL and domain release checklist are in [docs/INSTALL_ENDPOINT.md](docs/INSTALL_ENDPOINT.md):
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/fernandoiacosta/cognigenesis-harness/main/install.sh | sh
