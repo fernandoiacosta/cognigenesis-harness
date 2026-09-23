@@ -45,6 +45,7 @@ fi
 echo ""
 cogni --version
 echo "Configure a provider with: cogni login ollama --base-url http://127.0.0.1:11434"
+echo "Or run: cogni login openai | anthropic | google | grok | meta | litert | edge"
 
 echo ""
 echo "Installed successfully."

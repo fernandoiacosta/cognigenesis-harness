@@ -12,6 +12,7 @@ dependencies = [
   "platformdirs>=4.3,<5",
   "prompt-toolkit>=3.0.48,<4",
   "rich>=13.9,<15",
+  "keyring>=25,<27",
 ]
 
 [project.scripts]
