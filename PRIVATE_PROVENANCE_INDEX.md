@@ -1,7 +1,7 @@
-# Private Provenance Index
+# Protected Provenance Index
 
 Author and rights holder: **Fernando Acosta**  
-Status: **Private working record**
+Status: **Protected working record; publicly visible without granting reuse rights**
 
 | Record | Role | Evidence in this repository | Limit |
 |---|---|---|---|
