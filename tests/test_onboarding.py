@@ -41,6 +41,21 @@ def test_local_model_list_uses_openai_compatible_endpoint(monkeypatch):
     assert seen == ["http://192.168.1.10:1234/v1/models"]
 
 
+def test_guided_setup_reuses_existing_account_key(monkeypatch):
+    selected = iter(["openai", "existing", "gpt-4.1-mini", "signal", "save"])
+    saved = []
+    monkeypatch.setattr(onboarding, "choose", lambda *a, **kw: next(selected))
+    monkeypatch.setattr(onboarding, "_input", lambda label, default=None: default or ".")
+    monkeypatch.setattr(onboarding, "_cloud_models", lambda provider, secret: ["gpt-4.1-mini"])
+    monkeypatch.setattr(onboarding, "load_settings", lambda: Settings())
+    monkeypatch.setattr(onboarding, "save_settings", saved.append)
+    monkeypatch.setattr(onboarding.os, "getenv", lambda key: None)
+    monkeypatch.setattr(onboarding.keyring, "get_password", lambda *a: "saved-key")
+    monkeypatch.setattr(onboarding.getpass, "getpass", lambda *a: (_ for _ in ()).throw(AssertionError("must reuse saved key")))
+    assert onboarding.run_wizard()
+    assert saved[0].provider == "openai"
+
+
 def test_cloud_model_catalog_uses_header_and_filters_generation_models(monkeypatch):
     import io
     seen = {}

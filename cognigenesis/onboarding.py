@@ -20,8 +20,8 @@ from providers.ollama import list_models
 
 PROVIDERS = [
     ("ollama", "Ollama", "Local or network server · no account"),
-    ("openai", "OpenAI API", "API key · separate from ChatGPT/Codex subscription"),
-    ("anthropic", "Anthropic API", "API key · separate from Claude subscription"),
+    ("openai", "OpenAI / Codex models", "Your OpenAI API key · ChatGPT subscription sign-in unavailable"),
+    ("anthropic", "Anthropic / Claude models", "Your Anthropic API key · Claude subscription sign-in unavailable"),
     ("google", "Google Gemini API", "API key"),
     ("grok", "xAI Grok API", "API key"),
     ("meta", "Hosted Meta models", "Your inference endpoint and API key"),
@@ -177,9 +177,27 @@ def run_wizard() -> bool:
         print("  API keys are separate from consumer subscriptions. No browser tokens are imported.")
 
     secret = None
-    if provider in ENV_KEYS and not os.getenv(ENV_KEYS[provider]):
-        secret = getpass.getpass(f"  {provider} API key (hidden; leave blank to cancel): ").strip()
-        if not secret:
+    if provider in ENV_KEYS:
+        env_name = ENV_KEYS[provider]
+        env_key = os.getenv(env_name)
+        try:
+            stored_key = keyring.get_password("cognigenesis-harness", provider)
+        except Exception:
+            stored_key = None
+        if env_key:
+            print(f"  Using {env_name} from your environment.")
+        elif stored_key:
+            action = choose("Connect your account", [
+                ("existing", "Use saved API key", "Stored in the operating system credential manager"),
+                ("replace", "Use a different API key", "Enter a new key without displaying it"),
+            ], step=2, search=False)
+            if action is None:
+                return False
+            if action == "replace":
+                secret = getpass.getpass(f"  New {provider} API key (hidden): ").strip()
+        else:
+            secret = getpass.getpass(f"  {provider} API key (hidden; leave blank to cancel): ").strip()
+        if secret == "" or (not env_key and not stored_key and not secret):
             return False
     if provider in {"meta", "edge"} and not endpoint:
         print("  This provider requires a server address.")

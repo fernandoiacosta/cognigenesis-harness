@@ -1,5 +1,7 @@
 # Cognigenesis
 
+**Private working implementation — Fernando Acosta. All rights reserved. Not approved for public distribution.** See [PRIVATE_RELEASE_POLICY.md](PRIVATE_RELEASE_POLICY.md), [SOURCE_MANIFEST.md](SOURCE_MANIFEST.md), and [PRIVATE_PROVENANCE_INDEX.md](PRIVATE_PROVENANCE_INDEX.md).
+
 ![Cognigenesis logo](assets/brand/cognigenesis-logo.svg)
 
 **Cognitive operating environment for models, agents, teams, tools, and reasoning scaffolding.**
@@ -194,10 +196,10 @@ Ollama remains the local-first provider. Model qualification and trust gating re
 
 ## Provider setup
 
-Install on macOS, Linux, or Android Termux after the reviewed release is merged (review the installer before piping it to a shell). The planned short URL and domain release checklist are in [docs/INSTALL_ENDPOINT.md](docs/INSTALL_ENDPOINT.md):
+Authorized collaborators can install from the private repository with GitHub CLI access. Review the script before running it:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/fernandoiacosta/cognigenesis-harness/main/install.sh | sh
+gh api repos/fernandoiacosta/cognigenesis-harness/contents/install.sh -H 'Accept: application/vnd.github.raw+json' | sh
 ```
 
 Choose a provider; API keys are stored in your OS credential manager, or you can set the documented environment variable instead:
@@ -212,7 +214,7 @@ cogni login ollama --model llama3.1:8b --base-url http://192.168.1.20:11434
 cogni login litert --model YOUR_IMPORTED_MODEL
 ```
 
-`cogni harness` starts the interactive runtime (`cogni chat` remains an alias). `cogni login` configures API access. It does not authenticate a ChatGPT/Codex or Claude subscription. OpenAI, Anthropic, Google, xAI, and third-party Meta hosts require their own API key or host credentials. Environment overrides: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `COGNI_META_API_KEY`. `COGNI_PROVIDER`, `COGNI_MODEL`, `COGNI_OLLAMA_BASE_URL`, and `COGNI_CLOUD_BASE_URL` override saved settings. A single active provider/model is stored; switching providers requires another `cogni login` call.
+`cogni harness` starts the interactive runtime (`cogni chat` remains an alias). `cogni login` configures API access. It does not authenticate a ChatGPT/Codex or Claude subscription. OpenAI, Anthropic, Google, xAI, and third-party Meta hosts require their own API key or host credentials. The wizard reuses a saved API key and offers to replace it. Environment overrides: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `COGNI_META_API_KEY`. `COGNI_PROVIDER`, `COGNI_MODEL`, `COGNI_OLLAMA_BASE_URL`, and `COGNI_CLOUD_BASE_URL` override saved settings. A single active provider/model is stored; `/switch` in the harness reopens the menu.
 
 Google AI Edge Gallery's official app does not currently offer an external model server. An unmerged community Edge Server PR proposes one. For **on-device Google models today**, import a model into Google's LiteRT-LM CLI and run `litert-lm serve`, then `cogni login litert --model YOUR_IMPORTED_MODEL` (default `http://127.0.0.1:9379`). `cogni login edge --model MODEL --base-url http://PHONE_IP:PORT` targets a server-enabled Gallery build when available. Both local adapters use OpenAI-compatible text chat; tool calling is not available in this integration. Keep LAN inference servers on trusted networks.
 
