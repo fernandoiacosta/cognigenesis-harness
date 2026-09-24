@@ -3,7 +3,7 @@ from cognigenesis import onboarding
 
 
 def test_guided_ollama_flow_saves_selected_server_and_model(monkeypatch):
-    selected = iter(["ollama", "my-model:latest", "compact", "save"])
+    selected = iter(["ollama", "local", "my-model:latest", "compact", "save"])
     saved = []
     monkeypatch.setattr(onboarding, "choose", lambda *a, **kw: next(selected))
     monkeypatch.setattr(onboarding, "_input", lambda label, default=None: default or "")
@@ -13,6 +13,20 @@ def test_guided_ollama_flow_saves_selected_server_and_model(monkeypatch):
     assert onboarding.run_wizard()
     assert (saved[0].provider, saved[0].model, saved[0].composer_style) == ("ollama", "my-model:latest", "compact")
     assert saved[0].ollama_base_url == "http://127.0.0.1:11434"
+
+
+def test_guided_network_ollama_discovers_models_and_saves_address(monkeypatch):
+    selected = iter(["ollama", "network", "gemma3:4b", "signal", "save"])
+    saved = []
+    seen = []
+    monkeypatch.setattr(onboarding, "choose", lambda *a, **kw: next(selected))
+    monkeypatch.setattr(onboarding, "_input", lambda label, default=None: "http://192.168.1.20:11434" if "server URL" in label else ".")
+    monkeypatch.setattr(onboarding, "_models", lambda endpoint, **kw: (seen.append((endpoint, kw)) or ["gemma3:4b"]))
+    monkeypatch.setattr(onboarding, "load_settings", lambda: Settings())
+    monkeypatch.setattr(onboarding, "save_settings", saved.append)
+    assert onboarding.run_wizard()
+    assert seen == [("http://192.168.1.20:11434", {"openai_compatible": False})]
+    assert (saved[0].ollama_base_url, saved[0].model) == ("http://192.168.1.20:11434", "gemma3:4b")
 
 
 def test_cancel_does_not_save_configuration_or_credential(monkeypatch):

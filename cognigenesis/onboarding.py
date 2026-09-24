@@ -31,8 +31,8 @@ PROVIDERS = [
 ]
 
 STYLE = Style.from_dict({
-    "logo": "bold #62F5FF", "title": "bold #C96CFF", "muted": "#A7B0C3",
-    "selected": "bold #62F5FF", "detail": "#8B7CFF", "success": "#54E6A8",
+    "brand": "bold #62F5FF", "title": "bold #F4F5FB", "muted": "#A7B0C3",
+    "selected": "bold #111827 bg:#62F5FF", "detail": "#A9A0FF", "success": "#54E6A8",
 })
 
 
@@ -47,21 +47,25 @@ def choose(title: str, choices: list[tuple[str, str, str]], *, step: int, total:
 
     def render():
         fragments = [
-            ("class:logo", "\n   ◈  C O G N I G E N E S I S\n"),
-            ("class:muted", f"   Setup  {step} / {total}    {'━' * step}{'─' * (total - step)}\n\n"),
-            ("class:title", f"   {title}\n\n"),
+            ("class:brand", "\n   ◈  C O G N I G E N E S I S\n"),
+            ("class:muted", "   ────────────────────────────────────────\n"),
+            ("class:muted", f"   SETUP  {step:02d} / {total:02d}    "),
+            ("class:brand", f"{'●' * step}"),
+            ("class:muted", f"{'○' * (total - step)}\n\n"),
+            ("class:title", f"   {title}\n"),
+            ("class:muted", "   Your models. Your machine. Your workspace.\n\n"),
         ]
         if search:
             fragments.append(("class:muted", f"   Search  {query}▌\n\n"))
-        rows = max(4, min(10, (shutil.get_terminal_size().lines - 13) // 2))
+        rows = max(2, min(9, (shutil.get_terminal_size().lines - 13) // 2))
         start = max(0, min(selected - rows + 1, len(matches) - rows))
         for index, (value, label, detail) in enumerate(matches[start:start + rows], start=start):
             prefix = "   ❯ " if index == selected else "     "
-            fragments.append(("class:selected" if index == selected else "", prefix + label + "\n"))
+            fragments.append(("class:selected" if index == selected else "class:title", prefix + label + "\n"))
             fragments.append(("class:detail", "       " + detail + "\n"))
         if not matches:
             fragments.append(("class:muted", "     No matches. Backspace to broaden your search.\n"))
-        fragments.append(("class:muted", "\n   ↑↓ select  ·  Enter confirm  ·  Esc back" + ("  ·  type to search" if search else "") + "\n"))
+        fragments.append(("class:muted", "\n   ────────────────────────────────────────\n   ↑↓ navigate  ·  Enter select  ·  Esc back" + ("  ·  type to filter" if search else "") + "\n"))
         return fragments
 
     @keys.add("up")
@@ -167,7 +171,18 @@ def run_wizard() -> bool:
     print("\n  ◈ Connection  ·  step 2 / 5")
     endpoint = None
     if provider == "ollama":
-        endpoint = _input("Ollama address (local or LAN)", settings.ollama_base_url)
+        location = choose("Where is Ollama running?", [
+            ("local", "This device", "http://127.0.0.1:11434 · discover installed models"),
+            ("network", "Another device on my network", "Connect to your Ollama host and discover its models"),
+        ], step=2, search=False)
+        if location is None:
+            return False
+        endpoint = ("http://127.0.0.1:11434" if location == "local" else
+                    _input("Ollama server URL (http://HOST:11434)",
+                           settings.ollama_base_url if settings.ollama_base_url != "http://127.0.0.1:11434" else None))
+        if not endpoint or not endpoint.startswith(("http://", "https://")):
+            print("  Enter an Ollama URL beginning with http:// or https://.")
+            return False
     elif provider in {"litert", "edge", "local"}:
         defaults = {"litert": "http://127.0.0.1:9379", "local": "http://127.0.0.1:1234"}
         endpoint = _input("Server origin (no /v1 suffix)", defaults.get(provider))
@@ -209,6 +224,8 @@ def run_wizard() -> bool:
             models = _models(endpoint, openai_compatible=provider != "ollama")
         except (OSError, ValueError, error.URLError) as exc:
             print(f"  Could not list models at {endpoint}: {exc}")
+        if provider == "ollama" and not models:
+            print(f"  No Ollama models found at {endpoint}. Check the server address or enter an exact model ID.")
     if provider in {"openai", "anthropic", "google", "grok"}:
         models = _cloud_models(provider, secret)
     model_rows = [(name, name, "Installed on your server" if provider in {"ollama", "litert", "edge", "local"} else "Listed for this API key") for name in models]
