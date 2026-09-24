@@ -1,7 +1,7 @@
-# Private Evidence Ledger
+# Protected Evidence Ledger
 
 Author and rights holder: **Fernando Acosta**  
-Status: **Private working record**
+Status: **Protected working record; publicly visible without granting reuse rights**
 
 | Claim | Present evidence | Status |
 |---|---|---|
@@ -9,4 +9,4 @@ Status: **Private working record**
 | The harness improves model performance | Experiment 001 design, without preserved real-model outcomes | Unverified |
 | The harness derives from the ACOSTA and Cognigenesis frameworks | Related repository records and documentation | Historical interpretation; consult canonical originals and dated corroboration |
 
-Record exact commits and reproducible artifacts before upgrading any claim. Preserve inconclusive or negative results. No entry authorizes publication.
+Record exact commits and reproducible artifacts before upgrading any claim. Preserve inconclusive or negative results. No entry authorizes publication beyond the publicly visible default branch.
