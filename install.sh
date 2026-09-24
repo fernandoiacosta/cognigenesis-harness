@@ -84,7 +84,7 @@ cogni --version
 printf '%s  ───────────────────────────────────────────%s\n' "$M" "$R"
 printf '  Connect a model:  cogni login ollama --base-url http://YOUR_HOST:11434\n'
 printf '  Or use a cloud:   cogni login openai\n'
-printf '  Start:            cogni chat\n'
+printf '  Start:            cogni harness\n'
 if [ -n "$SCRIPTS" ]; then
   printf '\n  If cogni is missing in your next shell, add this to your shell profile:\n'
   printf '  export PATH="%s:$PATH"\n' "$SCRIPTS"

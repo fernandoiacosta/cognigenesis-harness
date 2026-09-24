@@ -49,7 +49,7 @@ Then run:
 ```text
 cogni setup
 cogni doctor
-cogni chat
+cogni harness
 ```
 
 ## Ollama

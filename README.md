@@ -52,7 +52,7 @@ Then:
 ```text
 cogni setup
 cogni doctor
-cogni chat
+cogni harness
 ```
 
 Inside chat:
@@ -212,7 +212,7 @@ cogni login ollama --model llama3.1:8b --base-url http://192.168.1.20:11434
 cogni login litert --model YOUR_IMPORTED_MODEL
 ```
 
-`cogni login` configures API access. It does not authenticate a ChatGPT/Codex or Claude subscription. OpenAI, Anthropic, Google, xAI, and third-party Meta hosts require their own API key or host credentials. Environment overrides: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `COGNI_META_API_KEY`. `COGNI_PROVIDER`, `COGNI_MODEL`, `COGNI_OLLAMA_BASE_URL`, and `COGNI_CLOUD_BASE_URL` override saved settings. A single active provider/model is stored; switching providers requires another `cogni login` call.
+`cogni harness` starts the interactive runtime (`cogni chat` remains an alias). `cogni login` configures API access. It does not authenticate a ChatGPT/Codex or Claude subscription. OpenAI, Anthropic, Google, xAI, and third-party Meta hosts require their own API key or host credentials. Environment overrides: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `COGNI_META_API_KEY`. `COGNI_PROVIDER`, `COGNI_MODEL`, `COGNI_OLLAMA_BASE_URL`, and `COGNI_CLOUD_BASE_URL` override saved settings. A single active provider/model is stored; switching providers requires another `cogni login` call.
 
 Google AI Edge Gallery's official app does not currently offer an external model server. An unmerged community Edge Server PR proposes one. For **on-device Google models today**, import a model into Google's LiteRT-LM CLI and run `litert-lm serve`, then `cogni login litert --model YOUR_IMPORTED_MODEL` (default `http://127.0.0.1:9379`). `cogni login edge --model MODEL --base-url http://PHONE_IP:PORT` targets a server-enabled Gallery build when available. Both local adapters use OpenAI-compatible text chat; tool calling is not available in this integration. Keep LAN inference servers on trusted networks.
 

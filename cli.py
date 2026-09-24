@@ -42,7 +42,7 @@ from providers.base import ProviderError
 from providers.factory import provider_identity
 
 VERSION = __version__
-KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "setup", "qualify", "doctor", "aionui", "config", "login"}
+KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "setup", "qualify", "doctor", "aionui", "config", "login", "harness"}
 
 
 def _provider_args(parser: argparse.ArgumentParser) -> None:
@@ -72,6 +72,9 @@ def _parser() -> argparse.ArgumentParser:
 
     chat = sub.add_parser("chat", help="Start the persistent themed chat interface")
     _provider_args(chat)
+
+    harness = sub.add_parser("harness", help="Start Cognigenesis Harness")
+    _provider_args(harness)
 
     team = sub.add_parser("team", help="Run a bounded Cognigenesis multi-agent team")
     _provider_args(team)
@@ -428,7 +431,7 @@ def main() -> None:
         save_settings(settings)
         success_message(f"Configured {name} / {settings.model or 'automatic'}. Run: cogni chat")
         return
-    if args.command == "chat":
+    if args.command in {"chat", "harness"}:
         raise SystemExit(_run_chat(args))
     if args.command == "team":
         raise SystemExit(_run_team(args))
