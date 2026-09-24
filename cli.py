@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import getpass
+import keyring
 import os
 import sys
 import webbrowser
@@ -21,7 +23,7 @@ from cognigenesis.bootstrap import (
     run_checks,
 )
 from cognigenesis.commandcenter.server import serve_command_center
-from cognigenesis.config import config_path, history_path, load_settings
+from cognigenesis.config import config_path, history_path, load_settings, save_settings
 from cognigenesis.console import (
     RuntimeIdentity,
     assistant_message,
@@ -40,14 +42,14 @@ from providers.base import ProviderError
 from providers.factory import provider_identity
 
 VERSION = __version__
-KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "setup", "qualify", "doctor", "aionui", "config"}
+KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "dashboard", "setup", "qualify", "doctor", "aionui", "config", "login", "harness"}
 
 
 def _provider_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--workspace", default=None, help="Workspace directory (default: current directory/config)")
-    parser.add_argument("--provider", default=None, choices=["ollama", "stub"])
-    parser.add_argument("--model", default=None, help="Ollama model name")
-    parser.add_argument("--base-url", default=None, help="Ollama base URL")
+    parser.add_argument("--provider", default=None, choices=["ollama", "openai", "anthropic", "google", "grok", "meta", "edge", "litert", "local", "stub"])
+    parser.add_argument("--model", default=None, help="Model name")
+    parser.add_argument("--base-url", default=None, help="Provider base URL")
     parser.add_argument("--timeout", default=None, type=float, help="Provider timeout in seconds")
 
 
@@ -71,6 +73,9 @@ def _parser() -> argparse.ArgumentParser:
     chat = sub.add_parser("chat", help="Start the persistent themed chat interface")
     _provider_args(chat)
 
+    harness = sub.add_parser("harness", help="Start Cognigenesis Harness")
+    _provider_args(harness)
+
     team = sub.add_parser("team", help="Run a bounded Cognigenesis multi-agent team")
     _provider_args(team)
     team.add_argument(
@@ -86,13 +91,24 @@ def _parser() -> argparse.ArgumentParser:
     command_center.add_argument("--host", default="127.0.0.1")
     command_center.add_argument("--port", default=8765, type=int)
     command_center.add_argument("--open", action="store_true", dest="open_browser", help="Open the dashboard in the default browser")
+    dashboard = sub.add_parser("dashboard", help="Open the local Cognigenesis Harness dashboard")
+    dashboard.add_argument("--workspace", default=None)
+    dashboard.add_argument("--host", default="127.0.0.1")
+    dashboard.add_argument("--port", default=8765, type=int)
+    dashboard.add_argument("--no-open", action="store_false", dest="open_browser", default=True)
 
     setup = sub.add_parser("setup", help="Configure, discover, and qualify the local Ollama model")
+    setup.add_argument("--guided", action="store_true", help="Open interactive provider and model setup")
     setup.add_argument("--model", default=None)
     setup.add_argument("--base-url", default=None)
     setup.add_argument("--timeout", type=float, default=None)
     setup.add_argument("--pull", action="store_true", help="Pull the selected Ollama model if it is missing")
     setup.add_argument("--skip-qualify", action="store_true", help="Skip first-run behavioral qualification")
+
+    login = sub.add_parser("login", help="Configure a provider and securely store its API key")
+    login.add_argument("provider", choices=["ollama", "openai", "anthropic", "google", "grok", "meta", "edge", "litert", "local"])
+    login.add_argument("--model", default=None)
+    login.add_argument("--base-url", default=None)
 
     qualify = sub.add_parser("qualify", help="Evaluate the configured model and persist its trust profile")
     qualify.add_argument("--model", default=None)
@@ -141,6 +157,7 @@ def _chat_help() -> None:
         "  [cogni.cyan]/tasks[/]         Inspect the shared task graph\n"
         "  [cogni.cyan]/events[/]        Inspect recent semantic runtime events\n"
         "  [cogni.cyan]/provider[/]      Show active provider/model\n"
+        "  [cogni.cyan]/switch[/]        Choose a provider, model, or terminal layout\n"
         "  [cogni.cyan]/workspace[/]     Show active workspace\n"
         "  [cogni.cyan]/doctor[/]        Run health diagnostics\n"
         "  [cogni.cyan]/exit[/]          Leave chat\n"
@@ -158,15 +175,22 @@ def _prompt_session() -> PromptSession:
 
 
 def _run_chat(args: argparse.Namespace) -> int:
+    if not config_path().exists() and sys.stdin.isatty() and sys.stdout.isatty():
+        from cognigenesis.onboarding import run_wizard
+        if not run_wizard():
+            return 1
     engine, workspace = _make_engine(args)
     provider_name, model_name = provider_identity(engine.provider)
     banner(VERSION, RuntimeIdentity(provider_name, model_name, str(workspace)))
     console.print(f"[cogni.muted]Trust:[/] {engine.policy.model_profile.tier.name}  [cogni.muted]• Type /help for commands.[/]\n")
+    console.print("[cogni.cyan]Quick start[/]  [cogni.muted]/provider[/] status  ·  [cogni.muted]/switch[/] models and providers  ·  [cogni.muted]/tasks[/] progress\n")
     session = _prompt_session()
 
     while True:
         try:
-            prompt = session.prompt([("class:prompt", "You › ")]).strip()
+            mode = load_settings().composer_style
+            prefix = "› " if mode == "minimal" else "cogni › " if mode == "compact" else f"◈ {model_name} › "
+            prompt = session.prompt([("class:prompt", prefix)]).strip()
         except EOFError:
             console.print("[cogni.muted]Session closed.[/]")
             return 0
@@ -196,6 +220,13 @@ def _run_chat(args: argparse.Namespace) -> int:
             continue
         if prompt == "/events":
             console.print_json(json.dumps([event.to_dict() for event in engine.events.history(limit=30)], ensure_ascii=False))
+            continue
+        if prompt == "/switch":
+            from cognigenesis.onboarding import run_wizard
+            if run_wizard():
+                engine, workspace = _make_engine(args)
+                provider_name, model_name = provider_identity(engine.provider)
+                success_message(f"Now using {provider_name} / {model_name}")
             continue
         if prompt == "/provider":
             p, m = provider_identity(engine.provider)
@@ -235,7 +266,7 @@ def _run_command_center(args: argparse.Namespace) -> int:
         serve_command_center(workspace, host=args.host, port=args.port)
     except KeyboardInterrupt:
         console.print("\n[cogni.muted]Command Center stopped.[/]")
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         error_message(f"Could not start Command Center: {exc}")
         return 1
     return 0
@@ -394,13 +425,43 @@ def main() -> None:
         parser.print_help(); return
     args = parser.parse_args(argv)
 
-    if args.command == "chat":
+    if args.command == "login":
+        from providers.cloud import DEFAULT_MODELS, ENV_KEYS
+        settings = load_settings()
+        name = args.provider
+        if name in ENV_KEYS and not os.getenv(ENV_KEYS[name]):
+            secret = getpass.getpass(f"{name} API key (stored in OS credential manager): ").strip()
+            if not secret:
+                parser.error("An API key is required; alternatively set " + ENV_KEYS[name])
+            try:
+                keyring.set_password("cognigenesis-harness", name, secret)
+            except Exception as exc:
+                parser.error(f"Credential storage unavailable: {exc}. Set {ENV_KEYS[name]} in your environment instead.")
+        if name == "meta" and not args.base_url:
+            parser.error("Meta needs --base-url for your inference host")
+        if name in {"edge", "local"} and not args.base_url:
+            parser.error("Edge Gallery requires --base-url for a server-enabled build; stock Gallery has no server")
+        if name == "ollama" and args.base_url:
+            settings.ollama_base_url = args.base_url.rstrip("/")
+        if name in {"edge", "litert", "local", "meta"}:
+            settings.cloud_base_url = args.base_url or ("http://127.0.0.1:9379" if name == "litert" else settings.cloud_base_url)
+        settings.provider = name
+        settings.model = args.model or DEFAULT_MODELS.get(name) or (settings.model if name == "ollama" else None)
+        if name in {"meta", "edge", "litert", "local"} and not settings.model:
+            parser.error("Specify --model for this provider")
+        save_settings(settings)
+        success_message(f"Configured {name} / {settings.model or 'automatic'}. Run: cogni chat")
+        return
+    if args.command in {"chat", "harness"}:
         raise SystemExit(_run_chat(args))
     if args.command == "team":
         raise SystemExit(_run_team(args))
-    if args.command == "command-center":
+    if args.command in {"command-center", "dashboard"}:
         raise SystemExit(_run_command_center(args))
     if args.command == "setup":
+        if args.guided or (sys.stdin.isatty() and sys.stdout.isatty() and not any((args.model, args.base_url, args.timeout, args.pull, args.skip_qualify))):
+            from cognigenesis.onboarding import run_wizard
+            raise SystemExit(0 if run_wizard() else 1)
         raise SystemExit(_run_setup(args))
     if args.command == "qualify":
         raise SystemExit(_run_qualify(args))

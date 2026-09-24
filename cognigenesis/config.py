@@ -21,7 +21,9 @@ class Settings:
     model: str | None = None
     ollama_base_url: str = DEFAULT_BASE_URL
     ollama_timeout: float = DEFAULT_TIMEOUT
+    cloud_base_url: str | None = None
     theme: str = "prime-dark"
+    composer_style: str = "signal"
     default_workspace: str = "."
 
 
@@ -57,13 +59,16 @@ def load_settings() -> Settings:
         model=data.get("model"),
         ollama_base_url=str(data.get("ollama_base_url", DEFAULT_BASE_URL)),
         ollama_timeout=float(data.get("ollama_timeout", DEFAULT_TIMEOUT)),
+        cloud_base_url=data.get("cloud_base_url"),
         theme=str(data.get("theme", "prime-dark")),
+        composer_style=str(data.get("composer_style", "signal")),
         default_workspace=str(data.get("default_workspace", ".")),
     )
 
     # Environment variables override persisted configuration.
     settings.provider = os.getenv("COGNI_PROVIDER", settings.provider)
-    settings.model = os.getenv("COGNI_OLLAMA_MODEL", settings.model)
+    settings.model = os.getenv("COGNI_MODEL", os.getenv("COGNI_OLLAMA_MODEL", settings.model))
+    settings.cloud_base_url = os.getenv("COGNI_CLOUD_BASE_URL", settings.cloud_base_url)
     settings.ollama_base_url = os.getenv("COGNI_OLLAMA_BASE_URL", settings.ollama_base_url)
     settings.ollama_timeout = float(os.getenv("COGNI_OLLAMA_TIMEOUT", settings.ollama_timeout))
     return settings

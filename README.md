@@ -1,5 +1,7 @@
 # Cognigenesis
 
+**Private working implementation — Fernando Acosta. All rights reserved. Not approved for public distribution.** See [PRIVATE_RELEASE_POLICY.md](PRIVATE_RELEASE_POLICY.md), [SOURCE_MANIFEST.md](SOURCE_MANIFEST.md), and [PRIVATE_PROVENANCE_INDEX.md](PRIVATE_PROVENANCE_INDEX.md).
+
 ![Cognigenesis logo](assets/brand/cognigenesis-logo.svg)
 
 **Cognitive operating environment for models, agents, teams, tools, and reasoning scaffolding.**
@@ -52,7 +54,7 @@ Then:
 ```text
 cogni setup
 cogni doctor
-cogni chat
+cogni harness
 ```
 
 Inside chat:
@@ -98,17 +100,18 @@ Each agent gets an isolated session while sharing the mission task graph, cognit
 Launch the first graphical Command Center:
 
 ```powershell
-cogni command-center --workspace . --open
+cogni dashboard --workspace .
 ```
 
-Then run `cogni chat --workspace .` or `cogni team ... --workspace .` in another terminal. The dashboard polls the same atomic workspace snapshot and displays:
+`cogni command-center --workspace . --open` remains available. Then run `cogni harness --workspace .` or `cogni team ... --workspace .` in another terminal. The dashboard polls the same atomic workspace snapshot and displays:
 
 - cognitive metrics, hypotheses, and evidence
 - task graph
 - teams and agents
 - recent semantic runtime events
+- the selected model and provider, without exposing credentials or connection URLs
 
-The current web dashboard is the first UI over the shared state contract, not a separate backend.
+The dashboard has Overview, Tasks, Agents, Cognition, Activity, and Models views; search and status filters; and a JSON snapshot export. It reads recorded state and does not start agents or edit provider settings. It binds to localhost only because it has no user authentication; use a trusted tunnel for access from another device. The current web dashboard is a UI over the shared state contract, not a separate backend.
 
 ## AionUi / ACP
 
@@ -191,3 +194,35 @@ Ollama remains the local-first provider. Model qualification and trust gating re
 ## Architectural invariant
 
 > The harness is the kernel. Cognigenesis is the cognition layer. Teams, swarm orchestration, and the Command Center grow above them without turning the kernel into a monolith.
+
+## Provider setup
+
+Authorized collaborators can install from the private repository with GitHub CLI access. Review the script before running it:
+
+```sh
+gh api repos/fernandoiacosta/cognigenesis-harness/contents/install.sh -H 'Accept: application/vnd.github.raw+json' | sh
+```
+
+Choose a provider; API keys are stored in your OS credential manager, or you can set the documented environment variable instead:
+
+```sh
+cogni login openai --model gpt-4.1-mini
+cogni login anthropic --model claude-sonnet-4-5
+cogni login google --model gemini-2.5-flash
+cogni login grok --model grok-3-mini
+cogni login meta --model YOUR_MODEL --base-url https://YOUR_INFERENCE_HOST/v1/chat/completions
+cogni login ollama --model llama3.1:8b --base-url http://192.168.1.20:11434
+cogni login litert --model YOUR_IMPORTED_MODEL
+```
+
+`cogni harness` starts the interactive runtime (`cogni chat` remains an alias). `cogni login` configures API access. It does not authenticate a ChatGPT/Codex or Claude subscription. OpenAI, Anthropic, Google, xAI, and third-party Meta hosts require their own API key or host credentials. The wizard reuses a saved API key and offers to replace it. Environment overrides: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `XAI_API_KEY`, `COGNI_META_API_KEY`. `COGNI_PROVIDER`, `COGNI_MODEL`, `COGNI_OLLAMA_BASE_URL`, and `COGNI_CLOUD_BASE_URL` override saved settings. A single active provider/model is stored; `/switch` in the harness reopens the menu.
+
+Google AI Edge Gallery's official app does not currently offer an external model server. An unmerged community Edge Server PR proposes one. For **on-device Google models today**, import a model into Google's LiteRT-LM CLI and run `litert-lm serve`, then `cogni login litert --model YOUR_IMPORTED_MODEL` (default `http://127.0.0.1:9379`). `cogni login edge --model MODEL --base-url http://PHONE_IP:PORT` targets a server-enabled Gallery build when available. Both local adapters use OpenAI-compatible text chat; tool calling is not available in this integration. Keep LAN inference servers on trusted networks.
+
+For remote Ollama, configure `--base-url` with the Ollama host's reachable address; server-side binding/firewall configuration is required on that machine. `cogni setup --base-url URL` also discovers its installed models.
+
+### Guided first run
+
+Run `cogni setup` in a terminal to open the Cognigenesis setup screens, or `cogni setup --guided` to force them. The installer starts the wizard when attached to a terminal; set `COGNI_SKIP_SETUP=1` to defer it. `cogni harness` opens setup automatically on a fresh terminal install. Existing scripted `cogni setup --model MODEL --base-url URL` remains available for Ollama.
+
+The guided screens select a provider, offer **this device** or **another device on my network** for Ollama, accept an API key or server address, search installed models from Ollama or a local OpenAI-compatible server, or fetch model IDs for a connected OpenAI, Anthropic, Google, or xAI API key, choose a terminal layout, and confirm before saving. If an Ollama server has no reachable models, the wizard reports that and allows an exact model ID; check the server before using the harness. Use `/switch` inside the interactive harness to change provider/model/layout later. API keys go into the operating system credential store; an environment variable is required when no secure keyring backend is present. ChatGPT/Codex and Claude subscription OAuth are not available through this integration. If a provider model-list request fails, a suggested ID and an exact-ID entry remain available; the catalog does not guarantee that every listed model supports chat or tools.
