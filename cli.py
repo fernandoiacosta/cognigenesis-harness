@@ -42,7 +42,7 @@ from providers.base import ProviderError
 from providers.factory import provider_identity
 
 VERSION = __version__
-KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "setup", "qualify", "doctor", "aionui", "config", "login", "harness"}
+KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "dashboard", "setup", "qualify", "doctor", "aionui", "config", "login", "harness"}
 
 
 def _provider_args(parser: argparse.ArgumentParser) -> None:
@@ -91,6 +91,11 @@ def _parser() -> argparse.ArgumentParser:
     command_center.add_argument("--host", default="127.0.0.1")
     command_center.add_argument("--port", default=8765, type=int)
     command_center.add_argument("--open", action="store_true", dest="open_browser", help="Open the dashboard in the default browser")
+    dashboard = sub.add_parser("dashboard", help="Open the local Cognigenesis Harness dashboard")
+    dashboard.add_argument("--workspace", default=None)
+    dashboard.add_argument("--host", default="127.0.0.1")
+    dashboard.add_argument("--port", default=8765, type=int)
+    dashboard.add_argument("--no-open", action="store_false", dest="open_browser", default=True)
 
     setup = sub.add_parser("setup", help="Configure, discover, and qualify the local Ollama model")
     setup.add_argument("--guided", action="store_true", help="Open interactive provider and model setup")
@@ -261,7 +266,7 @@ def _run_command_center(args: argparse.Namespace) -> int:
         serve_command_center(workspace, host=args.host, port=args.port)
     except KeyboardInterrupt:
         console.print("\n[cogni.muted]Command Center stopped.[/]")
-    except OSError as exc:
+    except (OSError, ValueError) as exc:
         error_message(f"Could not start Command Center: {exc}")
         return 1
     return 0
@@ -451,7 +456,7 @@ def main() -> None:
         raise SystemExit(_run_chat(args))
     if args.command == "team":
         raise SystemExit(_run_team(args))
-    if args.command == "command-center":
+    if args.command in {"command-center", "dashboard"}:
         raise SystemExit(_run_command_center(args))
     if args.command == "setup":
         if args.guided or (sys.stdin.isatty() and sys.stdout.isatty() and not any((args.model, args.base_url, args.timeout, args.pull, args.skip_qualify))):

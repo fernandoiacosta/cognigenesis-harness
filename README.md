@@ -100,17 +100,18 @@ Each agent gets an isolated session while sharing the mission task graph, cognit
 Launch the first graphical Command Center:
 
 ```powershell
-cogni command-center --workspace . --open
+cogni dashboard --workspace .
 ```
 
-Then run `cogni chat --workspace .` or `cogni team ... --workspace .` in another terminal. The dashboard polls the same atomic workspace snapshot and displays:
+`cogni command-center --workspace . --open` remains available. Then run `cogni harness --workspace .` or `cogni team ... --workspace .` in another terminal. The dashboard polls the same atomic workspace snapshot and displays:
 
 - cognitive metrics, hypotheses, and evidence
 - task graph
 - teams and agents
 - recent semantic runtime events
+- the selected model and provider, without exposing credentials or connection URLs
 
-The current web dashboard is the first UI over the shared state contract, not a separate backend.
+The dashboard has Overview, Tasks, Agents, Cognition, Activity, and Models views; search and status filters; and a JSON snapshot export. It reads recorded state and does not start agents or edit provider settings. It binds to localhost only because it has no user authentication; use a trusted tunnel for access from another device. The current web dashboard is a UI over the shared state contract, not a separate backend.
 
 ## AionUi / ACP
 
