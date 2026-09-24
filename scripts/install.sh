@@ -85,6 +85,10 @@ printf '%s  ──────────────────────�
 printf '  Connect a model:  cogni login ollama --base-url http://YOUR_HOST:11434\n'
 printf '  Or use a cloud:   cogni login openai\n'
 printf '  Start:            cogni harness\n'
+if [ -t 1 ] && [ -r /dev/tty ] && [ "${COGNI_SKIP_SETUP:-}" != 1 ]; then
+  printf '\n  Opening guided provider setup…\n'
+  cogni setup --guided </dev/tty || printf '  Setup skipped. Run cogni setup when ready.\n'
+fi
 if [ -n "$SCRIPTS" ]; then
   printf '\n  If cogni is missing in your next shell, add this to your shell profile:\n'
   printf '  export PATH="%s:$PATH"\n' "$SCRIPTS"

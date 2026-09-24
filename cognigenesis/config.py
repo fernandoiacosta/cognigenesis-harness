@@ -23,6 +23,7 @@ class Settings:
     ollama_timeout: float = DEFAULT_TIMEOUT
     cloud_base_url: str | None = None
     theme: str = "prime-dark"
+    composer_style: str = "signal"
     default_workspace: str = "."
 
 
@@ -60,6 +61,7 @@ def load_settings() -> Settings:
         ollama_timeout=float(data.get("ollama_timeout", DEFAULT_TIMEOUT)),
         cloud_base_url=data.get("cloud_base_url"),
         theme=str(data.get("theme", "prime-dark")),
+        composer_style=str(data.get("composer_style", "signal")),
         default_workspace=str(data.get("default_workspace", ".")),
     )
 
