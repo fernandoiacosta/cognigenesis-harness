@@ -4,14 +4,14 @@ Supported: Windows, macOS, Linux; Python 3.11–3.14.
 
 Current package version: `2.0.0a1`. The 2.0 alpha keeps the existing terminal, Ollama, and ACP/AionUi paths while adding the Cognigenesis team, event, task, cognition, and Command Center architecture.
 
-The repository is private, so the installer must run under a GitHub-authenticated account with repository access. `gh auth setup-git` is used automatically when GitHub CLI is available.
+The repository is publicly readable but remains copyright-protected and unlicensed for redistribution or model training. The installer does not require GitHub authentication. Review the script before piping it to a shell.
 
 ## Recommended install
 
 ### Windows PowerShell
 
 ```powershell
-$script = gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.ps1 -H "Accept: application/vnd.github.raw+json"; Invoke-Expression ($script -join "`n")
+irm https://raw.githubusercontent.com/fernandoiacosta/cognigenesis-harness/main/scripts/install.ps1 | iex
 ```
 
 The Windows installer:
@@ -26,7 +26,7 @@ The Windows installer:
 ### macOS / Linux
 
 ```bash
-gh api repos/fernandoiacosta/cognigenesis-harness/contents/scripts/install.sh -H "Accept: application/vnd.github.raw+json" | sh
+curl -fsSL https://raw.githubusercontent.com/fernandoiacosta/cognigenesis-harness/main/install.sh | sh
 ```
 
 The POSIX installer performs the same package/command verification and shows the exact user Scripts path when the shell PATH needs it.
