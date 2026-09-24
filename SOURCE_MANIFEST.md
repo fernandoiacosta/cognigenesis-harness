@@ -1,7 +1,7 @@
 # Source Manifest — Cognigenesis Harness
 
 Author and rights holder: **Fernando Acosta**  
-Status: **Private operational implementation; no public release approval**
+Status: **Protected public-source operational implementation; no license or additional release authority granted**
 
 ## Repository records
 
@@ -12,4 +12,4 @@ Status: **Private operational implementation; no public release approval**
 
 ## Release integrity
 
-Record the exact commit SHA, included files, reviewed changes, and explicit authorization before any public release. Preserve the pre-release commit and its Git history. See `PRIVATE_RELEASE_POLICY.md`.
+Record the exact commit SHA, included files, reviewed changes, and explicit authorization before any package, mirror, binary, hosted-service, benchmark, or other release beyond the publicly visible default branch. Preserve the preceding commit and its Git history. See `PRIVATE_RELEASE_POLICY.md`.
