@@ -1,6 +1,6 @@
 # Cognigenesis
 
-**Private working implementation — Fernando Acosta. All rights reserved. Not approved for public distribution.** See [PRIVATE_RELEASE_POLICY.md](PRIVATE_RELEASE_POLICY.md), [SOURCE_MANIFEST.md](SOURCE_MANIFEST.md), and [PRIVATE_PROVENANCE_INDEX.md](PRIVATE_PROVENANCE_INDEX.md).
+**Protected implementation — authored solely by Fernando Acosta. All rights reserved. Public visibility does not grant a license, redistribution rights, model-training permission, or shared authorship.** See [PRIVATE_RELEASE_POLICY.md](PRIVATE_RELEASE_POLICY.md), [SOURCE_MANIFEST.md](SOURCE_MANIFEST.md), and [PRIVATE_PROVENANCE_INDEX.md](PRIVATE_PROVENANCE_INDEX.md).
 
 ![Cognigenesis logo](assets/brand/cognigenesis-logo.svg)
 
@@ -43,7 +43,7 @@ The existing execution engine now emits those semantic events directly.
 
 ## Terminal
 
-Install/upgrade from the private repo:
+Install or upgrade from the protected public repository:
 
 ```powershell
 python -m pip install --user --upgrade --force-reinstall "git+https://github.com/fernandoiacosta/cognigenesis-harness.git"
@@ -197,10 +197,10 @@ Ollama remains the local-first provider. Model qualification and trust gating re
 
 ## Provider setup
 
-Authorized collaborators can install from the private repository with GitHub CLI access. Review the script before running it:
+Review the installer, then install on macOS, Linux, or Termux:
 
 ```sh
-gh api repos/fernandoiacosta/cognigenesis-harness/contents/install.sh -H 'Accept: application/vnd.github.raw+json' | sh
+curl -fsSL https://raw.githubusercontent.com/fernandoiacosta/cognigenesis-harness/main/install.sh | sh
 ```
 
 Choose a provider; API keys are stored in your OS credential manager, or you can set the documented environment variable instead:
