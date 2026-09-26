@@ -190,6 +190,7 @@ Ollama remains the local-first provider. Model qualification and trust gating re
 - [Security](SECURITY.md)
 - [Installation](INSTALL.md)
 - [Branding](BRANDING.md)
+- [Inside Armor, Exoskeleton, and decision-engine contract](docs/INTEGRATION_MODES.md)
 
 ## Architectural invariant
 
