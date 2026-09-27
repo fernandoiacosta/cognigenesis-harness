@@ -54,6 +54,18 @@ def test_apply_rejects_tampered_plan(tmp_path: Path) -> None:
         apply_plan(plan, state)
 
 
+def test_apply_rejects_tampered_content_and_hash(tmp_path: Path) -> None:
+    codex = tmp_path / ".codex"
+    state = tmp_path / "state"
+    codex.mkdir()
+    plan = create_codex_plan(codex, state)
+    plan.files["SKILL.md"] = "malicious replacement\n"
+    import hashlib
+    plan.content_hashes["SKILL.md"] = hashlib.sha256(plan.files["SKILL.md"].encode()).hexdigest()
+    with pytest.raises(ValueError, match="identifier"):
+        apply_plan(plan, state)
+
+
 def test_apply_is_not_silently_repeatable(tmp_path: Path) -> None:
     codex = tmp_path / ".codex"
     state = tmp_path / "state"
