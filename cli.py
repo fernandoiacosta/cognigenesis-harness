@@ -35,6 +35,14 @@ from cognigenesis.console import (
     warning_message,
 )
 from cognigenesis.fabric.patterns import TeamPattern
+from cognigenesis.integrations import (
+    apply_plan,
+    create_codex_plan,
+    discover_codex,
+    load_plan,
+    restore_integration,
+    verify_integration,
+)
 from core.model_profile import TrustTier
 from core.stdio import configure_utf8_stdio
 from harness import build_engine, build_team_runner
@@ -42,7 +50,7 @@ from providers.base import ProviderError
 from providers.factory import provider_identity
 
 VERSION = __version__
-KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "dashboard", "setup", "qualify", "doctor", "aionui", "config", "login", "harness"}
+KNOWN_COMMANDS = {"run", "chat", "team", "command-center", "dashboard", "setup", "qualify", "doctor", "aionui", "config", "login", "harness", "integrate"}
 
 
 def _provider_args(parser: argparse.ArgumentParser) -> None:
@@ -124,7 +132,46 @@ def _parser() -> argparse.ArgumentParser:
 
     config = sub.add_parser("config", help="Show the resolved persistent configuration")
     config.add_argument("--json", action="store_true", dest="as_json")
+
+    integrate = sub.add_parser("integrate", help="Plan, apply, verify, or restore a bounded host integration")
+    integrate_sub = integrate.add_subparsers(dest="integrate_command", required=True)
+    discover = integrate_sub.add_parser("discover", help="Detect supported host harnesses without executing them")
+    discover.add_argument("--json", action="store_true", dest="as_json")
+    plan = integrate_sub.add_parser("plan", help="Create a non-mutating integration plan")
+    plan.add_argument("--mode", required=True, choices=["inside-armor"])
+    plan.add_argument("--host", required=True, choices=["codex"])
+    plan.add_argument("--json", action="store_true", dest="as_json")
+    apply_cmd = integrate_sub.add_parser("apply", help="Apply a previously reviewed plan")
+    apply_cmd.add_argument("plan_id")
+    apply_cmd.add_argument("--json", action="store_true", dest="as_json")
+    verify = integrate_sub.add_parser("verify", help="Verify the active adapter against recorded hashes")
+    verify.add_argument("--json", action="store_true", dest="as_json")
+    restore = integrate_sub.add_parser("restore", help="Restore the configuration that preceded activation")
+    restore.add_argument("--json", action="store_true", dest="as_json")
     return parser
+
+
+def _run_integrate(args: argparse.Namespace) -> int:
+    if args.integrate_command == "discover":
+        result = discover_codex()
+    elif args.integrate_command == "plan":
+        result = create_codex_plan().to_dict()
+    elif args.integrate_command == "apply":
+        result = apply_plan(load_plan(args.plan_id))
+    elif args.integrate_command == "verify":
+        result = verify_integration()
+    elif args.integrate_command == "restore":
+        result = restore_integration()
+    else:  # pragma: no cover - argparse requires a known subcommand
+        raise ValueError("unknown integration command")
+    if args.as_json:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+    else:
+        banner(VERSION)
+        console.print_json(json.dumps(result, ensure_ascii=False))
+    if args.integrate_command == "verify" and not result.get("verified"):
+        return 1
+    return 0
 
 
 def _resolved_workspace(raw: str | None) -> Path:
@@ -476,6 +523,8 @@ def main() -> None:
         else:
             banner(VERSION); status_table([(k, str(v), "") for k, v in settings.__dict__.items()])
         return
+    if args.command == "integrate":
+        raise SystemExit(_run_integrate(args))
     if args.command == "run":
         engine, _workspace = _make_engine(args)
         objective = " ".join(args.objective)
