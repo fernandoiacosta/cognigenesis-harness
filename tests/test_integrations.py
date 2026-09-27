@@ -48,6 +48,7 @@ def test_apply_rejects_tampered_plan(tmp_path: Path) -> None:
     codex = tmp_path / ".codex"
     state = tmp_path / "state"
     codex.mkdir()
+    (codex / "config.toml").write_text("model = 'test'\n", encoding="utf-8")
     plan = create_codex_plan(codex, state)
     object.__setattr__(plan, "target_dir", str(tmp_path / "escape"))
     with pytest.raises(ValueError, match="bounded"):
@@ -58,6 +59,7 @@ def test_apply_rejects_tampered_content_and_hash(tmp_path: Path) -> None:
     codex = tmp_path / ".codex"
     state = tmp_path / "state"
     codex.mkdir()
+    (codex / "config.toml").write_text("model = 'test'\n", encoding="utf-8")
     plan = create_codex_plan(codex, state)
     plan.files["SKILL.md"] = "malicious replacement\n"
     import hashlib
@@ -70,7 +72,18 @@ def test_apply_is_not_silently_repeatable(tmp_path: Path) -> None:
     codex = tmp_path / ".codex"
     state = tmp_path / "state"
     codex.mkdir()
+    (codex / "config.toml").write_text("model = 'test'\n", encoding="utf-8")
     plan = create_codex_plan(codex, state)
     apply_plan(plan, state)
     with pytest.raises(FileExistsError):
+        apply_plan(plan, state)
+
+
+def test_apply_requires_a_detected_codex_installation(tmp_path: Path) -> None:
+    codex = tmp_path / ".codex"
+    state = tmp_path / "state"
+    codex.mkdir()
+    plan = create_codex_plan(codex, state)
+    assert plan.detected is False
+    with pytest.raises(ValueError, match="not detected"):
         apply_plan(plan, state)
