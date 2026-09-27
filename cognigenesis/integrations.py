@@ -133,7 +133,11 @@ def load_plan(plan_id: str, state_root: Path | None = None) -> IntegrationPlan:
 def apply_plan(plan: IntegrationPlan, state_root: Path | None = None) -> dict[str, Any]:
     if plan.host != "codex" or plan.mode != "inside-armor":
         raise ValueError("unsupported integration plan")
+    if not plan.detected:
+        raise ValueError("Codex was not detected when this plan was created")
     root = Path(plan.codex_home).resolve()
+    if not discover_codex(root)["detected"]:
+        raise ValueError("Codex is no longer detectable at the reviewed path")
     target = Path(plan.target_dir).resolve()
     expected = (root / "skills" / "cognigenesis").resolve()
     if target != expected or root not in target.parents:
