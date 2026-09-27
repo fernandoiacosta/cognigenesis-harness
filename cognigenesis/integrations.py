@@ -141,6 +141,12 @@ def apply_plan(plan: IntegrationPlan, state_root: Path | None = None) -> dict[st
     for name, content in plan.files.items():
         if Path(name).name != name or _sha256_bytes(content.encode("utf-8")) != plan.content_hashes[name]:
             raise ValueError("plan content failed integrity validation")
+    canonical = json.dumps(
+        {"host": "codex", "target": str(target), "hashes": plan.content_hashes, "version": ADAPTER_VERSION},
+        sort_keys=True,
+    ).encode("utf-8")
+    if _sha256_bytes(canonical)[:16] != plan.plan_id:
+        raise ValueError("plan identifier failed integrity validation")
 
     store = state_root or integration_root()
     backup = store / "backups" / plan.plan_id
