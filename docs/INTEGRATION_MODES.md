@@ -92,6 +92,17 @@ Exact command spelling may change before implementation, but dry-run, apply, ver
 
 ## Acceptance checks
 
+Before touching a real Codex home, run the isolated installed-package lifecycle:
+
+```text
+python scripts/accept_codex_integration.py
+```
+
+It creates a temporary Codex-shaped fixture and must report `PASS` after
+discovering, planning, applying, verifying, and restoring pre-existing skill
+content byte-for-byte. A pass does not replace acceptance on the operator's
+actual target device.
+
 The smallest shippable vertical slice is complete only when all of the following are preserved in GitHub and pass:
 
 1. A clean install reaches the three-mode setup screen.
