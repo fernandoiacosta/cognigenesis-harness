@@ -130,6 +130,28 @@ def load_plan(plan_id: str, state_root: Path | None = None) -> IntegrationPlan:
     return IntegrationPlan(**data)
 
 
+def _restore_files(
+    target: Path,
+    backup: Path,
+    originals: dict[str, dict[str, Any]],
+) -> None:
+    """Restore the exact pre-apply files or fail before discarding the backup."""
+    for name, original in originals.items():
+        destination = target / name
+        if original["existed"]:
+            source = backup / name
+            if not source.is_file() or _sha256_bytes(source.read_bytes()) != original["sha256"]:
+                raise ValueError("backup failed integrity validation")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source, destination)
+        elif destination.exists():
+            destination.unlink()
+    try:
+        target.rmdir()
+    except OSError:
+        pass
+
+
 def apply_plan(plan: IntegrationPlan, state_root: Path | None = None) -> dict[str, Any]:
     if plan.host != "codex" or plan.mode != "inside-armor":
         raise ValueError("unsupported integration plan")
@@ -168,10 +190,6 @@ def apply_plan(plan: IntegrationPlan, state_root: Path | None = None) -> dict[st
         else:
             originals[name] = {"existed": False, "sha256": None}
 
-    target.mkdir(parents=True, exist_ok=True)
-    for name, content in plan.files.items():
-        (target / name).write_text(content, encoding="utf-8")
-
     record = {
         "plan_id": plan.plan_id,
         "host": plan.host,
@@ -184,7 +202,17 @@ def apply_plan(plan: IntegrationPlan, state_root: Path | None = None) -> dict[st
         "activation_state": "ACTIVE",
         "credentials_copied": False,
     }
-    _write_json(store / "active.json", record)
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+        for name, content in plan.files.items():
+            (target / name).write_text(content, encoding="utf-8")
+        _write_json(store / "active.json", record)
+    except Exception:
+        # An interrupted or failed apply must never leave Codex partially
+        # modified without an active-state record that can be restored.
+        _restore_files(target, backup, originals)
+        shutil.rmtree(backup)
+        raise
     return record
 
 
@@ -211,20 +239,7 @@ def restore_integration(state_root: Path | None = None) -> dict[str, Any]:
     record = json.loads(active.read_text(encoding="utf-8"))
     target = Path(record["target_dir"])
     backup = Path(record["backup_dir"])
-    for name, original in record["originals"].items():
-        destination = target / name
-        if original["existed"]:
-            source = backup / name
-            if not source.is_file() or _sha256_bytes(source.read_bytes()) != original["sha256"]:
-                raise ValueError("backup failed integrity validation")
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source, destination)
-        elif destination.exists():
-            destination.unlink()
-    try:
-        target.rmdir()
-    except OSError:
-        pass
+    _restore_files(target, backup, record["originals"])
     restored = {**record, "restored": True, "activation_state": "REMOVED"}
     _write_json(store / "last_restore.json", restored)
     active.unlink()
