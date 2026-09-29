@@ -87,3 +87,31 @@ def test_apply_requires_a_detected_codex_installation(tmp_path: Path) -> None:
     assert plan.detected is False
     with pytest.raises(ValueError, match="not detected"):
         apply_plan(plan, state)
+
+
+def test_apply_rolls_back_after_partial_write_failure(tmp_path: Path, monkeypatch) -> None:
+    codex = tmp_path / ".codex"
+    state = tmp_path / "state"
+    codex.mkdir()
+    (codex / "config.toml").write_text("model = 'test'\n", encoding="utf-8")
+    target = codex / "skills" / "cognigenesis"
+    target.mkdir(parents=True)
+    original = b"original skill\n"
+    (target / "SKILL.md").write_bytes(original)
+    plan = create_codex_plan(codex, state)
+
+    real_write_text = Path.write_text
+
+    def fail_on_manifest(self, data, *args, **kwargs):
+        if self.name == ".cognigenesis-adapter.json":
+            raise OSError("simulated interrupted apply")
+        return real_write_text(self, data, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "write_text", fail_on_manifest)
+    with pytest.raises(OSError, match="interrupted"):
+        apply_plan(plan, state)
+
+    assert (target / "SKILL.md").read_bytes() == original
+    assert not (target / ".cognigenesis-adapter.json").exists()
+    assert not (state / "active.json").exists()
+    assert not (state / "backups" / plan.plan_id).exists()
