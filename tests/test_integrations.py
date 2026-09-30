@@ -100,14 +100,14 @@ def test_apply_rolls_back_after_partial_write_failure(tmp_path: Path, monkeypatc
     (target / "SKILL.md").write_bytes(original)
     plan = create_codex_plan(codex, state)
 
-    real_write_text = Path.write_text
+    real_write_bytes = Path.write_bytes
 
     def fail_on_manifest(self, data, *args, **kwargs):
         if self.name == ".cognigenesis-adapter.json":
             raise OSError("simulated interrupted apply")
-        return real_write_text(self, data, *args, **kwargs)
+        return real_write_bytes(self, data, *args, **kwargs)
 
-    monkeypatch.setattr(Path, "write_text", fail_on_manifest)
+    monkeypatch.setattr(Path, "write_bytes", fail_on_manifest)
     with pytest.raises(OSError, match="interrupted"):
         apply_plan(plan, state)
 
