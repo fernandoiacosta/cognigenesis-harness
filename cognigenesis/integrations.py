@@ -205,7 +205,10 @@ def apply_plan(plan: IntegrationPlan, state_root: Path | None = None) -> dict[st
     try:
         target.mkdir(parents=True, exist_ok=True)
         for name, content in plan.files.items():
-            (target / name).write_text(content, encoding="utf-8")
+            # Write canonical bytes. Text-mode writes translate LF to CRLF on
+            # Windows, which would make the installed bytes disagree with the
+            # SHA-256 hashes reviewed in the plan.
+            (target / name).write_bytes(content.encode("utf-8"))
         _write_json(store / "active.json", record)
     except Exception:
         # An interrupted or failed apply must never leave Codex partially
