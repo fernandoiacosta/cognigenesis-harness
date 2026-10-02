@@ -15,6 +15,7 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.styles import Style
 
 from cognigenesis import __version__
+from cognigenesis.acceptance import run_codex_acceptance
 from cognigenesis.bootstrap import (
     aionui_configuration,
     auto_setup,
@@ -148,10 +149,15 @@ def _parser() -> argparse.ArgumentParser:
     verify.add_argument("--json", action="store_true", dest="as_json")
     restore = integrate_sub.add_parser("restore", help="Restore the configuration that preceded activation")
     restore.add_argument("--json", action="store_true", dest="as_json")
+    accept = integrate_sub.add_parser("accept", help="Create a credential-free Codex device acceptance report")
+    accept.add_argument("--apply", action="store_true", help="Temporarily apply, verify, and restore the adapter")
+    accept.add_argument("--output", type=Path, help="Report path (default: timestamped JSON in the current directory)")
+    accept.add_argument("--json", action="store_true", dest="as_json")
     return parser
 
 
 def _run_integrate(args: argparse.Namespace) -> int:
+    exit_code = 0
     if args.integrate_command == "discover":
         result = discover_codex()
     elif args.integrate_command == "plan":
@@ -162,6 +168,11 @@ def _run_integrate(args: argparse.Namespace) -> int:
         result = verify_integration()
     elif args.integrate_command == "restore":
         result = restore_integration()
+    elif args.integrate_command == "accept":
+        exit_code, result = run_codex_acceptance(
+            apply=args.apply,
+            output=args.output,
+        )
     else:  # pragma: no cover - argparse requires a known subcommand
         raise ValueError("unknown integration command")
     if args.as_json:
@@ -170,8 +181,8 @@ def _run_integrate(args: argparse.Namespace) -> int:
         banner(VERSION)
         console.print_json(json.dumps(result, ensure_ascii=False))
     if args.integrate_command == "verify" and not result.get("verified"):
-        return 1
-    return 0
+        exit_code = 1
+    return exit_code
 
 
 def _resolved_workspace(raw: str | None) -> Path:
