@@ -57,6 +57,18 @@ cogni doctor
 cogni harness
 ```
 
+Create a credential-free Codex device acceptance report. The first command is
+non-mutating; use `--apply` only after reviewing its discovered target:
+
+```text
+cogni integrate accept --json
+cogni integrate accept --apply --json
+```
+
+Both commands write a timestamped JSON report. The apply path temporarily
+installs the reviewed adapter, verifies its hashes, and restores the exact
+pre-existing state before returning `PASS` or `FAIL`.
+
 Inside chat:
 
 ```text
