@@ -7,64 +7,100 @@ from __future__ import annotations
 from typing import Any
 
 
+MAX_NODES = 2000
+MAX_LINKS = 4000
+
+
 def topology(snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Bounded display projection; labels are text, identities are never truncated."""
+    if not isinstance(snapshot, dict):
+        snapshot = {}
     nodes: dict[str, dict[str, str]] = {}
     links: dict[tuple[str, str, str], dict[str, str]] = {}
+    truncated = False
 
-    def node(kind: str, value: Any, label: Any = None) -> str:
-        ident = f"{kind}:{str(value)[:160]}"
-        nodes[ident] = {"id": ident, "type": kind, "label": str(label if label is not None else value)[:100]}
+    def items(value: Any, limit: int) -> list:
+        nonlocal truncated
+        if not isinstance(value, list):
+            return []
+        truncated |= len(value) > limit
+        return value[:limit]
+
+    def node(kind: str, value: Any, label: Any = None) -> str | None:
+        nonlocal truncated
+        if not isinstance(value, str) or not value:
+            return None
+        ident = f"{kind}:{value}"
+        if ident not in nodes and len(nodes) >= MAX_NODES:
+            truncated = True
+            return None
+        # A reference must not replace the entity's recorded display name.
+        if ident not in nodes or label is not None:
+            nodes[ident] = {"id": ident, "type": kind,
+                            "label": str(label if label is not None else value)[:100]}
         return ident
 
-    def edge(source: str, target: str, relation: str) -> None:
-        if source != target:
-            links[(source, target, relation)] = {"source": source, "target": target, "relation": relation}
+    def edge(source: str | None, target: str | None, relation: str) -> None:
+        nonlocal truncated
+        if source and target and source != target:
+            key = (source, target, relation)
+            if key not in links and len(links) >= MAX_LINKS:
+                truncated = True
+                return
+            links[key] = {"source": source, "target": target, "relation": relation}
 
-    for task in (snapshot.get("tasks") or [])[:500]:
+    for task in items(snapshot.get("tasks"), 500):
         if not isinstance(task, dict):
             continue
-        ident = task.get("id")
-        if not ident:
+        task_id = node("task", task.get("id"), task.get("title"))
+        if not task_id:
             continue
-        task_id = node("task", ident, task.get("title") or ident)
-        for dependency in (task.get("dependencies") or [])[:50]:
+        for dependency in items(task.get("dependencies"), 50):
             edge(task_id, node("task", dependency), "depends_on")
-        if task.get("assigned_agent"):
-            edge(node("agent", task["assigned_agent"]), task_id, "assigned")
-    for team in (snapshot.get("teams") or [])[:100]:
+        edge(node("agent", task.get("assigned_agent")), task_id, "assigned")
+    for team in items(snapshot.get("teams"), 100):
         if not isinstance(team, dict):
             continue
-        team_id = node("team", team.get("id") or team.get("name") or "unnamed",
-                       team.get("name") or "Team")
-        for agent in (team.get("agents") or [])[:100]:
-            if not isinstance(agent, dict):
-                continue
-            agent_id = node("agent", agent.get("id") or agent.get("name") or "unnamed",
-                            agent.get("name") or "Agent")
-            edge(team_id, agent_id, "contains")
-    cognition = snapshot.get("cognition") or {}
-    if isinstance(cognition, dict):
-        for hypothesis in (cognition.get("hypotheses") or [])[:200]:
-            if isinstance(hypothesis, dict) and hypothesis.get("claim"):
-                node("hypothesis", hypothesis.get("id") or hypothesis["claim"], hypothesis["claim"])
-        for evidence in (cognition.get("evidence") or [])[:200]:
-            if not isinstance(evidence, dict) or not evidence.get("claim"):
-                continue
-            evidence_id = node("evidence", evidence.get("id") or evidence["claim"], evidence["claim"])
-            for key in ("hypothesis_id", "claim_id"):
-                if evidence.get(key):
-                    target = f"hypothesis:{str(evidence[key])[:160]}"
-                    if target in nodes:
-                        edge(evidence_id, target, "supports")
-    for event in (snapshot.get("events") or [])[-300:]:
-        if not isinstance(event, dict):
+        team_id = node("team", team.get("id"), team.get("name"))
+        if not team_id:
             continue
-        source = event.get("source")
-        if source and source != "runtime":
-            node("source", source)
+        for agent in items(team.get("agents"), 100):
+            if isinstance(agent, dict):
+                edge(team_id, node("agent", agent.get("id"), agent.get("name")), "contains")
+    cognition = snapshot.get("cognition")
+    if isinstance(cognition, dict):
+        hypotheses = items(cognition.get("hypotheses"), 200)
+        evidence_items = items(cognition.get("evidence"), 200)
+        for hypothesis in hypotheses:
+            if isinstance(hypothesis, dict):
+                node("hypothesis", hypothesis.get("id"), hypothesis.get("claim"))
+        evidence_by_id = {}
+        for evidence in evidence_items:
+            if isinstance(evidence, dict):
+                ident = node("evidence", evidence.get("id"), evidence.get("claim"))
+                if ident:
+                    evidence_by_id[evidence["id"]] = evidence
+        for hypothesis in hypotheses:
+            if not isinstance(hypothesis, dict):
+                continue
+            target = f"hypothesis:{hypothesis.get('id')}"
+            if target not in nodes:
+                continue
+            for evidence_id in items(hypothesis.get("evidence_ids"), 200):
+                if not isinstance(evidence_id, str) or evidence_id not in evidence_by_id:
+                    continue
+                evidence = evidence_by_id[evidence_id]
+                polarity = evidence.get("polarity", "neutral")
+                relation = polarity if polarity in {"supports", "contradicts"} else "neutral"
+                edge(f"evidence:{evidence_id}", target, relation)
+    events = snapshot.get("events")
+    events = events if isinstance(events, list) else []
+    for event in events[-300:]:
+        if isinstance(event, dict) and event.get("source") != "runtime":
+            node("source", event.get("source"))
     return {"nodes": list(nodes.values()), "links": list(links.values()),
-            "updated_at": snapshot.get("updated_at"),
-            "event_count": len(snapshot.get("events") or [])}
+            "updated_at": snapshot.get("updated_at"), "event_count": len(events),
+            "truncated": truncated}
 
 
 HTML = r"""<!doctype html>
@@ -90,23 +126,25 @@ aside{background:#101a2a;border-left:1px solid #23354a;padding:18px}.metric{padd
 'use strict';
 const kinds={task:'#65d5ff',agent:'#9b8cff',team:'#54e6ad',hypothesis:'#f5a5e5',evidence:'#e8bc79',source:'#91a6bf'};
 const el=id=>document.getElementById(id),canvas=el('scene'),ctx=canvas.getContext('2d');
-let nodes=[],edges=[],width=600,height=500,pointer=null,frame=0,lastUpdate=0,fetching=false;
+let nodes=[],edges=[],width=600,height=500,frame=0,fetching=false,remaining=0,animation=null,signature='';
 el('legend').textContent='';
 for(const [kind,color] of Object.entries(kinds)){const row=document.createElement('div'),dot=document.createElement('i');dot.style.background=color;row.append(dot,document.createTextNode(kind));el('legend').append(row)}
-function resize(){const r=el('viewport').getBoundingClientRect();width=r.width;height=r.height;const d=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.floor(width*d));canvas.height=Math.max(1,Math.floor(height*d));ctx.setTransform(d,0,0,d,0,0)}
+function wake(){remaining=300;if(animation===null&&!document.hidden)animation=requestAnimationFrame(step)}
+function resize(){const r=el('viewport').getBoundingClientRect();width=r.width;height=r.height;const d=Math.min(devicePixelRatio||1,2);canvas.width=Math.max(1,Math.floor(width*d));canvas.height=Math.max(1,Math.floor(height*d));ctx.setTransform(d,0,0,d,0,0);wake()}
 new ResizeObserver(resize).observe(el('viewport'));resize();
 const hash=s=>{let n=2166136261;for(let i=0;i<s.length;i++){n^=s.charCodeAt(i);n=Math.imul(n,16777619)}return n>>>0};
-function integrate(data){const previous=new Map(nodes.map(n=>[n.id,n]));nodes=(data.nodes||[]).map(n=>{const old=previous.get(n.id),seed=hash(n.id),a=(seed%6283)/1000;return {...n,x:old?.x??width/2+100*Math.cos(a),y:old?.y??height/2+100*Math.sin(a),vx:old?.vx??0,vy:old?.vy??0}});
+function integrate(data){const next=JSON.stringify([data.nodes,data.links]);if(next===signature){el('eventCount').textContent=data.event_count||0;el('stamp').textContent=data.updated_at?new Date(data.updated_at).toLocaleTimeString():'No state';return}signature=next;wake();const previous=new Map(nodes.map(n=>[n.id,n]));nodes=(data.nodes||[]).map(n=>{const old=previous.get(n.id),seed=hash(n.id),a=(seed%6283)/1000;return {...n,x:old?.x??width/2+100*Math.cos(a),y:old?.y??height/2+100*Math.sin(a),vx:old?.vx??0,vy:old?.vy??0}});
 const lookup=new Map(nodes.map(n=>[n.id,n]));edges=(data.links||[]).filter(e=>lookup.has(e.source)&&lookup.has(e.target)).map(e=>({...e,a:lookup.get(e.source),b:lookup.get(e.target)}));
-el('nodeCount').textContent=nodes.length;el('linkCount').textContent=edges.length;el('eventCount').textContent=data.event_count||0;el('stamp').textContent=data.updated_at?new Date(data.updated_at).toLocaleTimeString():'No state';lastUpdate=Date.now();}
-async function refresh(){if(fetching)return;fetching=true;try{const res=await fetch('/api/topology',{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);integrate(await res.json());el('status').textContent='Snapshot connected'}catch(err){el('status').textContent='Unavailable: '+err.message}finally{fetching=false}}
-function step(){frame++;ctx.clearRect(0,0,width,height);ctx.fillStyle='#080e19';ctx.fillRect(0,0,width,height);
-for(let i=0;i<nodes.length;i++){const a=nodes[i];for(let j=i+1;j<nodes.length;j++){const b=nodes[j],dx=a.x-b.x,dy=a.y-b.y,dist2=Math.max(100,dx*dx+dy*dy),force=Math.min(1.5,1100/dist2),dist=Math.sqrt(dist2);a.vx+=dx/dist*force;b.vx-=dx/dist*force;a.vy+=dy/dist*force;b.vy-=dy/dist*force}}
+el('nodeCount').textContent=nodes.length;el('linkCount').textContent=edges.length;el('eventCount').textContent=data.event_count||0;el('stamp').textContent=data.updated_at?new Date(data.updated_at).toLocaleTimeString():'No state';}
+async function refresh(){if(fetching||document.hidden)return;fetching=true;try{const res=await fetch('/api/topology',{cache:'no-store'});if(!res.ok)throw Error('HTTP '+res.status);const data=await res.json();integrate(data);el('status').textContent=data.truncated?'Snapshot connected · display limit reached':'Snapshot connected'}catch(err){el('status').textContent='Unavailable: '+err.message}finally{fetching=false}}
+function step(){animation=null;if(document.hidden)return;frame++;remaining--;ctx.clearRect(0,0,width,height);ctx.fillStyle='#080e19';ctx.fillRect(0,0,width,height);
+for(let i=0;i<nodes.length;i++){const a=nodes[i];const stride=Math.max(1,Math.ceil((nodes.length-i-1)/32));for(let j=i+1+(frame%stride);j<nodes.length;j+=stride){const b=nodes[j],dx=a.x-b.x,dy=a.y-b.y,dist2=Math.max(100,dx*dx+dy*dy),force=Math.min(1.5,1100/dist2),dist=Math.sqrt(dist2);a.vx+=dx/dist*force;b.vx-=dx/dist*force;a.vy+=dy/dist*force;b.vy-=dy/dist*force}}
 for(const e of edges){const dx=e.b.x-e.a.x,dy=e.b.y-e.a.y,dist=Math.max(1,Math.hypot(dx,dy)),force=(dist-115)*0.0018;e.a.vx+=dx/dist*force;e.a.vy+=dy/dist*force;e.b.vx-=dx/dist*force;e.b.vy-=dy/dist*force;ctx.strokeStyle='#4d789590';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(e.a.x,e.a.y);ctx.lineTo(e.b.x,e.b.y);ctx.stroke()}
 for(const n of nodes){n.vx+=(width/2-n.x)*0.00025;n.vy+=(height/2-n.y)*0.00025;n.vx*=0.86;n.vy*=0.86;n.x=Math.max(20,Math.min(width-20,n.x+n.vx));n.y=Math.max(20,Math.min(height-20,n.y+n.vy));
 ctx.beginPath();ctx.arc(n.x,n.y,5,0,Math.PI*2);ctx.fillStyle=kinds[n.type]||'#ccc';ctx.fill();
 if(nodes.length<100){ctx.font='11px system-ui';ctx.fillStyle='#d4e4fa';ctx.fillText(n.label.slice(0,29),n.x+9,n.y-7)}}
 if(!nodes.length){ctx.fillStyle='#91a7c3';ctx.font='15px system-ui';ctx.textAlign='center';ctx.fillText('No recorded entities yet — run the harness to populate this graph.',width/2,height/2);ctx.textAlign='left'}
-requestAnimationFrame(step)}
-refresh();setInterval(refresh,3000);requestAnimationFrame(step);
+if(remaining>0)animation=requestAnimationFrame(step)}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){refresh();wake()}});
+refresh();setInterval(refresh,3000);
 </script></body></html>"""

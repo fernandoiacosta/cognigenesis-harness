@@ -1,7 +1,10 @@
 from __future__ import annotations
 
-import json
+import base64
+import hashlib
 import ipaddress
+import json
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -74,6 +77,15 @@ document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',(
 """
 
 
+def _page_csp(page: str) -> str:
+    hashes = " ".join(
+        "'sha256-" + base64.b64encode(hashlib.sha256(script.encode("utf-8")).digest()).decode("ascii") + "'"
+        for script in re.findall(r"<script>(.*?)</script>", page, re.DOTALL)
+    )
+    return ("default-src 'none'; script-src " + hashes + "; style-src 'unsafe-inline'; "
+            "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+
+
 def serve_command_center(workspace: Path, host: str = "127.0.0.1", port: int = 8765) -> None:
     if not _loopback(host):
         raise ValueError("The dashboard is read-only but has no login; bind to localhost and use a trusted tunnel for remote access.")
@@ -84,7 +96,7 @@ def serve_command_center(workspace: Path, host: str = "127.0.0.1", port: int = 8
         def do_GET(self) -> None:
             host_header = self.headers.get("Host", "")
             authority = host_header[1:].split("]", 1)[0] if host_header.startswith("[") else host_header.split(":", 1)[0]
-            if not _loopback(authority):
+            if not _loopback(authority) or self.headers.get("Sec-Fetch-Site") == "cross-site":
                 self.send_error(403)
                 return
             path = urlparse(self.path).path
@@ -99,12 +111,13 @@ def serve_command_center(workspace: Path, host: str = "127.0.0.1", port: int = 8
                 self.wfile.write(body)
                 return
             if path in {"/", "/index.html", "/geometry"}:
-                body = (GEOMETRY_HTML if path == "/geometry" else HTML).encode("utf-8")
+                page = GEOMETRY_HTML if path == "/geometry" else HTML
+                body = page.encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
-                self.send_header("Content-Security-Policy", "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'")
+                self.send_header("Content-Security-Policy", _page_csp(page))
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
                 self.wfile.write(body)
