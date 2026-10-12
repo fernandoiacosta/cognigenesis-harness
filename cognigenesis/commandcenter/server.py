@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from cognigenesis.commandcenter.store import CommandCenterStore
+from cognigenesis.commandcenter.geometry import HTML as GEOMETRY_HTML, topology
 from cognigenesis.config import load_settings
 
 
@@ -41,7 +42,7 @@ main{min-width:0;padding:24px clamp(16px,3vw,44px) 60px;max-width:1600px;width:1
 @media(max-width:900px){.shell{grid-template-columns:1fr}aside{position:static;height:auto;padding:12px;gap:10px}.nav{display:flex;overflow-x:auto}.nav button{white-space:nowrap}.navlabel,.foot{display:none}.identity{padding:0 7px}.card,.third{grid-column:span 12}main{padding:16px}.top{align-items:start}.actions{justify-content:end}}@media(max-width:560px){.top{display:block}.actions{margin-top:14px}.toolbar{flex-wrap:wrap}.toolbar input{min-width:100%}}
 </style>
 </head>
-<body><div class="shell"><aside><div class="identity"><div class="glyph">◈</div><div><strong>COGNIGENESIS</strong><small>HARNESS / PRIVATE</small></div></div><div><div class="navlabel">Workspace</div><nav class="nav" aria-label="Dashboard sections"><button class="active" data-view="overview"><span>◉</span>Overview</button><button data-view="tasks"><span>▤</span>Tasks</button><button data-view="agents"><span>◇</span>Agents</button><button data-view="cognition"><span>✧</span>Cognition</button><button data-view="activity"><span>≋</span>Activity</button><button data-view="models"><span>⬡</span>Models</button></nav></div><div class="foot"><strong>● Local control</strong>Read-only view of the selected workspace. Runtime updates appear automatically.</div></aside><main><header class="top"><div><div class="eyebrow">OPERATIONS / COMMAND CENTER</div><h1>Harness dashboard</h1></div><div class="actions"><button id="download" class="action">Export snapshot</button><button id="refresh" class="action primary">↻ Refresh</button></div></header><div class="notice">PRIVATE WORKSPACE · This dashboard shows recorded harness state. It does not start agents or change credentials. Run <code>cogni harness</code> or <code>cogni team</code> in this workspace to generate activity.</div>
+<body><div class="shell"><aside><div class="identity"><div class="glyph">◈</div><div><strong>COGNIGENESIS</strong><small>HARNESS / PRIVATE</small></div></div><div><div class="navlabel">Workspace</div><nav class="nav" aria-label="Dashboard sections"><button class="active" data-view="overview"><span>◉</span>Overview</button><button data-view="tasks"><span>▤</span>Tasks</button><button data-view="agents"><span>◇</span>Agents</button><button data-view="cognition"><span>✧</span>Cognition</button><button data-view="activity"><span>≋</span>Activity</button><button data-view="models"><span>⬡</span>Models</button></nav></div><div class="foot"><strong>● Local control</strong>Read-only view of the selected workspace. Runtime updates appear automatically.</div></aside><main><header class="top"><div><div class="eyebrow">OPERATIONS / COMMAND CENTER</div><h1>Harness dashboard</h1></div><div class="actions"><a class="action" href="/geometry">Live geometry ↗</a><button id="download" class="action">Export snapshot</button><button id="refresh" class="action primary">↻ Refresh</button></div></header><div class="notice">PRIVATE WORKSPACE · This dashboard shows recorded harness state. It does not start agents or change credentials. Run <code>cogni harness</code> or <code>cogni team</code> in this workspace to generate activity.</div>
 <section class="view active" id="overview"><div class="hero"><div><h2>Overview</h2><p>Live signals from your harness workspace.</p></div><div class="signal"><span class="dot off" id="liveDot"></span><span id="updated">Waiting for runtime</span></div></div><div class="grid"><article class="card third"><h3>Mission tasks</h3><div class="metric"><div><div class="big" id="taskCount">0</div><div class="small">tracked tasks</div></div><div class="big" id="taskDone">0</div></div><div class="meter"><span id="taskBar" style="width:0%"></span></div></article><article class="card third"><h3>Team agents</h3><div class="big" id="agentCount">0</div><div class="small">recorded across teams</div></article><article class="card third"><h3>Cognitive ledger</h3><div class="big" id="hypCount">0</div><div class="small">active hypotheses</div><div class="pills"><span class="pill" id="contraCount">0 contradictions</span><span class="pill" id="questionCount">0 open questions</span></div></article><article class="card"><div class="cardheader"><h3>Selected model</h3><span class="pill good" id="providerBadge">Loading</span></div><div class="model" id="modelName">Not selected</div><div class="small" id="connection">Configure with cogni setup</div></article><article class="card"><div class="cardheader"><h3>Recent activity</h3><button class="action" data-go="activity">View all →</button></div><div id="recentEvents" class="empty">No events recorded.</div></article><article class="card full"><div class="cardheader"><h3>Mission board</h3><button class="action" data-go="tasks">All tasks →</button></div><div id="overviewTasks" class="empty">No tasks recorded.</div></article></div></section>
 <section class="view" id="tasks"><div class="hero"><div><h2>Tasks</h2><p>Recorded work and dependencies.</p></div></div><div class="toolbar"><input id="taskSearch" type="search" placeholder="Search tasks" aria-label="Search tasks"><select id="taskFilter" aria-label="Filter task status"><option value="">All statuses</option><option>pending</option><option>ready</option><option>running</option><option>blocked</option><option>completed</option><option>failed</option><option>cancelled</option></select></div><article class="card full" id="allTasks"></article></section>
 <section class="view" id="agents"><div class="hero"><div><h2>Agents & teams</h2><p>Team membership, roles, and pending messages.</p></div></div><article class="card full" id="allTeams"></article></section>
@@ -87,8 +88,8 @@ def serve_command_center(workspace: Path, host: str = "127.0.0.1", port: int = 8
                 self.send_error(403)
                 return
             path = urlparse(self.path).path
-            if path in {"/api/state", "/api/config"}:
-                body = json.dumps(store.load() if path == "/api/state" else dashboard_config(), ensure_ascii=False).encode("utf-8")
+            if path in {"/api/state", "/api/config", "/api/topology"}:
+                body = json.dumps(topology(store.load()) if path == "/api/topology" else store.load() if path == "/api/state" else dashboard_config(), ensure_ascii=False).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
@@ -97,8 +98,8 @@ def serve_command_center(workspace: Path, host: str = "127.0.0.1", port: int = 8
                 self.end_headers()
                 self.wfile.write(body)
                 return
-            if path in {"/", "/index.html"}:
-                body = HTML.encode("utf-8")
+            if path in {"/", "/index.html", "/geometry"}:
+                body = (GEOMETRY_HTML if path == "/geometry" else HTML).encode("utf-8")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html; charset=utf-8")
                 self.send_header("Cache-Control", "no-store")
