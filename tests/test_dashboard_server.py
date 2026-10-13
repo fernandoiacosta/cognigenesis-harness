@@ -57,10 +57,12 @@ def test_geometry_http_boundary_and_content(tmp_path, monkeypatch):
     store.save({"tasks": [{"id": "t", "title": "<script>untrusted</script>", "metadata": {"api_key": "secret"}}]})
     thread = Thread(target=server.serve_command_center, args=(tmp_path,), daemon=True)
     thread.start()
-    http = ready.get(timeout=5)
+    # Hosted macOS runners can take more than five seconds to schedule a new
+    # Python thread under load. Startup time is not part of this boundary test.
+    http = ready.get(timeout=30)
 
     def request(path, headers=None):
-        connection = HTTPConnection("127.0.0.1", http.server_port, timeout=5)
+        connection = HTTPConnection("127.0.0.1", http.server_port, timeout=10)
         try:
             connection.request("GET", path, headers=headers or {})
             response = connection.getresponse()
@@ -83,4 +85,4 @@ def test_geometry_http_boundary_and_content(tmp_path, monkeypatch):
         assert request("/geometry", {"Sec-Fetch-Site": "none"})[0] == 200
     finally:
         http.shutdown()
-        thread.join(timeout=5)
+        thread.join(timeout=10)
