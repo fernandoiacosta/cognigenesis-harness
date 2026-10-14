@@ -86,7 +86,9 @@ def _page_csp(page: str) -> str:
             "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
-def serve_command_center(workspace: Path, host: str = "127.0.0.1", port: int = 8765) -> None:
+def create_command_center_server(
+    workspace: Path, host: str = "127.0.0.1", port: int = 8765
+) -> ThreadingHTTPServer:
     if not _loopback(host):
         raise ValueError("The dashboard is read-only but has no login; bind to localhost and use a trusted tunnel for remote access.")
     state_path = workspace / ".cognigenesis" / "command-center.json"
@@ -127,7 +129,11 @@ def serve_command_center(workspace: Path, host: str = "127.0.0.1", port: int = 8
         def log_message(self, _format: str, *_args) -> None:
             return
 
-    server = ThreadingHTTPServer((host, port), Handler)
+    return ThreadingHTTPServer((host, port), Handler)
+
+
+def serve_command_center(workspace: Path, host: str = "127.0.0.1", port: int = 8765) -> None:
+    server = create_command_center_server(workspace, host, port)
     try:
         server.serve_forever()
     finally:
