@@ -37,29 +37,17 @@ def test_page_csp_pins_inline_scripts():
             assert f"'sha256-{digest}'" in csp
 
 
-def test_geometry_http_boundary_and_content(tmp_path, monkeypatch):
+def test_geometry_http_boundary_and_content(tmp_path):
     import json
     from http.client import HTTPConnection
-    from http.server import ThreadingHTTPServer
-    from queue import Queue
     from threading import Thread
     from cognigenesis.commandcenter.store import CommandCenterStore
 
-    ready = Queue()
-
-    def factory(address, handler):
-        http = ThreadingHTTPServer((address[0], 0), handler)
-        ready.put(http)
-        return http
-
-    monkeypatch.setattr(server, "ThreadingHTTPServer", factory)
     store = CommandCenterStore(tmp_path / ".cognigenesis" / "command-center.json")
     store.save({"tasks": [{"id": "t", "title": "<script>untrusted</script>", "metadata": {"api_key": "secret"}}]})
-    thread = Thread(target=server.serve_command_center, args=(tmp_path,), daemon=True)
+    http = server.create_command_center_server(tmp_path, port=0)
+    thread = Thread(target=http.serve_forever, daemon=True)
     thread.start()
-    # Hosted macOS runners can take more than five seconds to schedule a new
-    # Python thread under load. Startup time is not part of this boundary test.
-    http = ready.get(timeout=30)
 
     def request(path, headers=None):
         connection = HTTPConnection("127.0.0.1", http.server_port, timeout=10)
@@ -85,4 +73,5 @@ def test_geometry_http_boundary_and_content(tmp_path, monkeypatch):
         assert request("/geometry", {"Sec-Fetch-Site": "none"})[0] == 200
     finally:
         http.shutdown()
+        http.server_close()
         thread.join(timeout=10)
