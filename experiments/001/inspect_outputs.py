@@ -9,7 +9,10 @@ import argparse
 import json
 from collections import defaultdict
 from pathlib import Path
+import sys
 
+# Also works from a source checkout without a package installation.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from cognigenesis.runtime.output_interpreter import interpret_output
 
 HERE = Path(__file__).resolve().parent
