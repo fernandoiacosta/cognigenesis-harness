@@ -12,6 +12,7 @@ class EventType(StrEnum):
     TURN_STARTED = "turn.started"
     MODEL_STARTED = "model.started"
     MODEL_COMPLETED = "model.completed"
+    OUTPUT_INTERPRETED = "output.interpreted"
     TOOL_REQUESTED = "tool.requested"
     TOOL_STARTED = "tool.started"
     TOOL_COMPLETED = "tool.completed"
