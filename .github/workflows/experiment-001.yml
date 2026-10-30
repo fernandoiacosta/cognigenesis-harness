@@ -1,0 +1,69 @@
+name: Cognigenesis Experiment 001 (frozen Ollama comparison)
+
+on:
+  push:
+    branches:
+      - eval/001-ollama-2026-10-29
+    paths:
+      - .github/workflows/experiment-001.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  frozen-experiment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout exact experiment snapshot
+        uses: actions/checkout@v4
+
+      - name: Install Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Ollama
+        run: curl -fsSL https://ollama.com/install.sh | sh
+
+      - name: Start local Ollama server
+        shell: bash
+        run: |
+          nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:11434/api/tags > /dev/null; then
+              echo "Ollama ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          cat "$RUNNER_TEMP/ollama.log"
+          exit 1
+
+      - name: Download and identify one model
+        run: |
+          ollama pull qwen2.5:1.5b
+          ollama list
+          curl -fsS http://127.0.0.1:11434/api/tags
+
+      - name: Run unchanged pre-registered Experiment 001
+        shell: bash
+        run: |
+          python experiments/001/run.py --model qwen2.5:1.5b --runs 3 --temperature 0.2 --timeout 120
+
+      - name: Print machine-readable result
+        if: always()
+        shell: bash
+        run: |
+          find experiments/001/results -name report.json -print -exec cat {} \; 2>/dev/null || true
+          if [ -f "$RUNNER_TEMP/ollama.log" ]; then tail -n 20 "$RUNNER_TEMP/ollama.log"; fi
+
+      - name: Preserve raw records and evaluator reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cognigenesis-experiment-001-${{ github.run_id }}
+          path: experiments/001/results/
+          retention-days: 7
+          if-no-files-found: ignore
