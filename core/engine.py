@@ -6,6 +6,7 @@ from uuid import uuid4
 from cognigenesis.cognition.ledger import CognitiveLedger
 from cognigenesis.fabric.team import TeamManager
 from cognigenesis.runtime.events import EventBus, EventType
+from cognigenesis.runtime.output_interpreter import InterpretedOutput, interpret_output
 from cognigenesis.runtime.taskgraph import TaskGraph
 from core.context import ContextCompiler
 from core.policy import Policy
@@ -44,6 +45,7 @@ class ExecutionEngine:
         self.teams = team_manager or TeamManager()
         self.session_id = session_id or uuid4().hex
         self.history: list[dict] = self.state.conversation()[-80:]
+        self.last_interpretation: InterpretedOutput | None = None
 
     def _emit(self, event_type: EventType, payload: dict | None = None, *, turn_id: str | None = None):
         return self.events.emit(
@@ -118,6 +120,12 @@ class ExecutionEngine:
                 return self._cancelled_result(step, turn_id=turn_id)
 
             if response.final is not None:
+                # Interpretation is observational: never alter the answer, execute
+                # tools from model prose, invent confidence, or enforce JSON.
+                self.last_interpretation = interpret_output(response.final)
+                interpretation_metadata = self.last_interpretation.metadata()
+                self.state.record_event("output_interpreted", interpretation_metadata)
+                self._emit(EventType.OUTPUT_INTERPRETED, interpretation_metadata, turn_id=turn_id)
                 self._commit_turn(objective, turn_items, response.final)
                 self.state.record_event("final", {"step": step, "text": response.final})
                 self._emit(EventType.TURN_COMPLETED, {"step": step, "text": response.final}, turn_id=turn_id)
