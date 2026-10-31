@@ -29,6 +29,14 @@ One prompt field, explicit model selection, Compare button, three FULL raw answe
 | Customer proof | No reliable cohort/retention/pricing data reviewed | 10 invited people, 30 blinded comparisons, repeat-use and payment intent (P0) |
 | IP/privacy | Protected repositories and reserved licensing | Evaluation terms, data handling, consent, access controls, API terms (P0) |
 
+## Local web preview (implemented on this branch)
+```bash
+ollama pull gemma4:e2b
+python experiments/compare/server.py
+# Visit http://127.0.0.1:8787
+```
+One page, three visible answer cards, matched model configuration, and unique local JSON records. No cloud hosting or public access. This is a runnable *local* prototype, not a hardened internet service. Do not port-forward it or tunnel it onto the public internet without adding authentication and access controls. The UI currently displays latency and output tokens; independent accuracy scoring and blinded voting are not yet implemented.
+
 ## Engineering rules
 - NO silent model switching, no assumption custom GPTs/Gems have an authorized callable API.
 - Version, pin and hash prompts, profiles, model digest, configs, model output, timestamps and costs.
