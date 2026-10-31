@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cognigenesis Compare | Local Preview</title>
+<style>
+:root{font-family:system-ui,Arial;background:#0f1321;color:#eaf0ff}
+*{box-sizing:border-box}body{margin:0 auto;max-width:1140px;padding:28px 18px}
+h1{font-size:clamp(26px,4vw,44px);margin:0 0 10px}p{color:#b4bfd4}
+textarea,input{width:100%;border:1px solid #4b5777;border-radius:10px;background:#1b2336;color:inherit;padding:12px;font:inherit}
+textarea{min-height:120px;resize:vertical}label{display:block;margin:16px 0 8px;font-size:14px}
+button{background:#b5c4ff;color:#111827;border:0;border-radius:9px;padding:12px 18px;font-weight:700;cursor:pointer}
+button:disabled{opacity:.6;cursor:wait}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-top:22px}
+article{background:#1b2336;border:1px solid #43516d;border-radius:14px;padding:15px;min-height:220px;overflow-wrap:anywhere}
+article h2{font-size:16px;margin:0 0 10px}pre{font:14px/1.55 system-ui;white-space:pre-wrap;overflow-wrap:anywhere}
+small{color:#a7b3ce}#status{min-height:26px;color:#c4d0ef}footer{margin-top:24px;color:#a7b3ce;font-size:13px}
+@media(max-width:800px){.grid{grid-template-columns:1fr}}
+</style>
+<h1>Ask once. Compare three ways of thinking.</h1>
+<p>Local-only preview: same Ollama model, same question, cumulative reasoning frameworks. No claim of improved intelligence until independently tested.</p>
+<form id="form"><label for="model">Approved model ID (must already be installed)</label><input id="model" value="gemma4:e2b" required>
+<label for="prompt">Your question</label><textarea id="prompt" required>What is the smallest honest experiment to test whether a new AI architecture improves reasoning?</textarea>
+<p><button id="go" type="submit">Compare three answers</button></p></form>
+<div role="status" aria-live="polite" id="status"></div>
+<div class="grid">
+<article><h2>Regular model</h2><small id="a-meta">Not run</small><pre id="a"></pre></article>
+<article><h2>ACOSTA V3</h2><small id="b-meta">Not run</small><pre id="b"></pre></article>
+<article><h2>ACOSTA V3 + Cognigenesis V6</h2><small id="c-meta">Not run</small><pre id="c"></pre></article>
+</div>
+<footer>Operationalized, abbreviated profiles. Full raw answers are preserved in a dated local comparison record. This application binds to 127.0.0.1 only; do not expose it to the public internet.</footer>
+<script>
+document.getElementById('form').addEventListener('submit',async function(event){
+ event.preventDefault();const go=document.getElementById('go'), status=document.getElementById('status');
+ go.disabled=true;status.textContent='Running the same model three times. This may take a few minutes on CPU.';
+ try{
+ const response=await fetch('/api/compare',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({prompt:document.getElementById('prompt').value,model:document.getElementById('model').value})});
+ const result=await response.json();if(!response.ok)throw Error(result.error||'Request failed');
+ for(const [i,r] of result.records.entries()){
+   const key=['a','b','c'][i];document.getElementById(key).textContent=r.error?('Error: '+r.error):r.raw_output;
+   document.getElementById(key+'-meta').textContent=(r.latency_seconds??'?')+' s · '+(r.completion_tokens??'?')+' output tokens';
+ }
+ status.textContent='Completed. All answers are shown without modification. Saved as '+result.id+'.';
+ }catch(e){status.textContent='Unable to complete: '+e.message;}
+ finally{go.disabled=false;}
+});
+</script></html>
