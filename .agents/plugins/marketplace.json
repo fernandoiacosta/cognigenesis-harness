@@ -1,33 +1,9 @@
 {
-  "name": "cognigenesis",
+  "name": "cognigenesis-harness-plugins",
   "interface": {
-    "displayName": "Cognigenesis"
+    "displayName": "Cognigenesis Harness"
   },
   "plugins": [
-    {
-      "name": "acosta-v3",
-      "source": {
-        "source": "local",
-        "path": "./plugins/acosta-v3"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
-    {
-      "name": "cognigenesis-v6",
-      "source": {
-        "source": "local",
-        "path": "./plugins/cognigenesis-v6"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Productivity"
-    },
     {
       "name": "cognigenesis-harness",
       "source": {
