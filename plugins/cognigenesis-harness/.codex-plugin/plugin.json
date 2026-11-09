@@ -1,0 +1,13 @@
+{
+  "name": "cognigenesis-harness",
+  "version": "1.0.0",
+  "description": "Operate the installed Cognigenesis Harness for diagnostics, team runs, or ACP integration.",
+  "author": {
+    "name": "Fernando Acosta"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Cognigenesis Harness",
+    "shortDescription": "Operate the installed Cognigenesis Harness for diagnostics, team runs, or ACP integration."
+  }
+}
