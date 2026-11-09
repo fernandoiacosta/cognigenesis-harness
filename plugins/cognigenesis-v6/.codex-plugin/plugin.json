@@ -1,0 +1,13 @@
+{
+  "name": "cognigenesis-v6",
+  "version": "1.0.0",
+  "description": "Apply Fernando Acosta’s V6 framework to plan, execute, verify, and refine a task.",
+  "author": {
+    "name": "Fernando Acosta"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Cognigenesis v6.0",
+    "shortDescription": "Apply Fernando Acosta’s V6 framework to plan, execute, verify, and refine a task."
+  }
+}
