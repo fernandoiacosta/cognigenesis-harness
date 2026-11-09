@@ -1,0 +1,13 @@
+{
+  "name": "acosta-v3",
+  "version": "1.0.0",
+  "description": "Apply Fernando Acosta’s V3 roadmap to a problem, design, or evidence review.",
+  "author": {
+    "name": "Fernando Acosta"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "ACOSTA Protocol 3.0",
+    "shortDescription": "Apply Fernando Acosta’s V3 roadmap to a problem, design, or evidence review."
+  }
+}
